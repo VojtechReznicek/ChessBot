@@ -72,6 +72,8 @@ impl Bitboards {
         println!();
     }
 
+
+
     pub fn make_moves(&mut self, moves: &[String]) {
         if moves.len() % 2 == 0 {
             self.side_to_move = SideToMove::White;
@@ -82,17 +84,20 @@ impl Bitboards {
         for m in moves {
             let from_mask = square_to_mask(&m[0..2]);
             let to_mask = square_to_mask(&m[2..4]);
+            let mut captured_a_piece = false;
 
             let move_mask = from_mask | to_mask;
 
-            if m.len() == 5 { // Promoting
+            // Promoting
+            if m.len() == 5 {
                 for i in 0..12 {
                     if (self.pieces[i] & to_mask) != 0 {   // Capture
                         self.pieces[i] &= !to_mask;
+                        captured_a_piece = true;
                         break;
                     }
                 }
-                if (self.pieces[P] & from_mask) != 0 { // White promoting
+                if (self.pieces[P] & from_mask) != 0 { // White pawn promoting
                     self.pieces[P] ^= from_mask;
                     let promoting_type = match m.as_bytes()[4] {
                         b'n' => N,
@@ -103,7 +108,7 @@ impl Bitboards {
                     };
                     self.pieces[promoting_type] ^= to_mask;
                 }
-                else {    // Black promoting
+                else {    // Black pawn promoting
                     self.pieces[p] ^= from_mask;
                     let promoting_type = match m.as_bytes()[4] {
                         b'n' => n,
@@ -116,23 +121,57 @@ impl Bitboards {
                 }
                 continue;
             }
-            else {  // Normal move
+            else {  // Normal move, castle, En Passant
+                let is_pawn_moving = (self.pieces[P] & from_mask) != 0 || (self.pieces[p] & from_mask) != 0;
+
                 for i in 0..12 {
-                    if (self.pieces[i] & to_mask) != 0 {   // Capture
+                    if (self.pieces[i] & to_mask) != 0 {   // Usual capture
                         self.pieces[i] &= !to_mask;
+                        captured_a_piece = true;
                         break;
                     }
                 }
-                for i in 0..12 {
-                    if (self.pieces[i] & from_mask) != 0 {  // The move
+
+                if is_pawn_moving && m.as_bytes()[0] != m.as_bytes()[2] && !captured_a_piece { // En Passant
+                    let col = m.as_bytes()[2] - b'a';
+                    let row = m.as_bytes()[1] - b'1';
+                    let index = row * 8 + col;
+                    let en_passant_capture_mask = 1u64 << index;
+
+                    self.pieces[p] &= !en_passant_capture_mask;
+                    self.pieces[P] &= !en_passant_capture_mask;
+                }
+
+                for i in 0..12 { // The move
+                    if (self.pieces[i] & from_mask) != 0 {
                         self.pieces[i] ^= move_mask;
                         break;
                     }
                 }
+
+                match m.as_ref() {  // Castling
+                    "e1g1" => if (self.pieces[K] & to_mask) != 0 { self.make_simple_move("h1f1") },
+                    "e1c1" => if (self.pieces[K] & to_mask) != 0 { self.make_simple_move("a1d1") },
+                    "e8g8" => if (self.pieces[k] & to_mask) != 0 { self.make_simple_move("h8f8") },
+                    "e8c8" => if (self.pieces[k] & to_mask) != 0 { self.make_simple_move("a8d8") },
+                    _ => {}
+                }
             }
+            self.print_board();
+        }
+    }
 
 
-
+    /// Assist function for simply moving one piece (without capturing)
+    fn make_simple_move(&mut self, m: &str) {
+        let from_mask = square_to_mask(&m[0..2]);
+        let to_mask = square_to_mask(&m[2..4]);
+        let move_mask = from_mask | to_mask;
+        for i in 0..12 {
+            if (self.pieces[i] & from_mask) != 0 {  // The move
+                self.pieces[i] ^= move_mask;
+                break;
+            }
         }
     }
 }
@@ -145,3 +184,4 @@ fn square_to_mask(square: &str) -> u64 {
     let index = row * 8 + col;
     1u64 << index
 }
+

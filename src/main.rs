@@ -5,7 +5,6 @@ use crate::board::Bitboards;
 
 fn main() {
     let mut board = Bitboards::new();
-    board.print_board();
 
     loop {
         let input = get_input();
