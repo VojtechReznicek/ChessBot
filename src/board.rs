@@ -15,12 +15,21 @@ pub const k: usize = 11;
 
 pub struct Bitboards {
     pub pieces: [u64; 12],
-    pub side_to_move: SideToMove
+    pub side_to_move: SideToMove,
+    pub castling_rights: CastlingRights,
+    pub halfmove_clock: u8,
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum SideToMove {
     Black,
     White,
+}
+#[derive()]
+pub struct CastlingRights {
+    pub white_kingside: bool,
+    pub white_queenside: bool,
+    pub black_kingside: bool,
+    pub black_queenside: bool,
 }
 
 impl Bitboards {
@@ -42,8 +51,14 @@ impl Bitboards {
         pieces[k] = 0x1000_0000_0000_0000;
 
         let mut side_to_move = SideToMove::White;
-
-        Self { pieces, side_to_move }
+        let mut castling_rights= CastlingRights{
+            white_queenside: true,
+            white_kingside: true,
+            black_queenside: true,
+            black_kingside: true,
+        };
+        let mut halfmove_clock = 0;
+        Self { pieces, side_to_move, castling_rights, halfmove_clock }
     }
 
     pub fn print_board(&self) {
@@ -64,7 +79,6 @@ impl Bitboards {
                         break;
                     }
                 }
-
                 print!("{} ", current_piece);
             }
             println!();
@@ -88,8 +102,8 @@ impl Bitboards {
 
             let move_mask = from_mask | to_mask;
 
-            // Promoting
-            if m.len() == 5 {
+
+            if m.len() == 5 {  // Promoting
                 for i in 0..12 {
                     if (self.pieces[i] & to_mask) != 0 {   // Capture
                         self.pieces[i] &= !to_mask;
@@ -119,6 +133,7 @@ impl Bitboards {
                     };
                     self.pieces[promoting_type] ^= to_mask;
                 }
+                self.halfmove_clock = 0;
                 continue;
             }
             else {  // Normal move, castle, En Passant
@@ -128,6 +143,7 @@ impl Bitboards {
                     if (self.pieces[i] & to_mask) != 0 {   // Usual capture
                         self.pieces[i] &= !to_mask;
                         captured_a_piece = true;
+                        self.halfmove_clock = 0;
                         break;
                     }
                 }
@@ -156,6 +172,35 @@ impl Bitboards {
                     "e8c8" => if (self.pieces[k] & to_mask) != 0 { self.make_simple_move("a8d8") },
                     _ => {}
                 }
+                if is_pawn_moving || captured_a_piece {
+                    self.halfmove_clock = 0;
+                }
+                else { // nothing reset the halfmove clock
+                    self.halfmove_clock += 1;
+                }
+            }
+
+            match &m[0..2] { // Rook or King moved and lost castling rights
+                "a1" => self.castling_rights.white_queenside = false,
+                "h1" => self.castling_rights.white_kingside = false,
+                "e1" => {
+                    self.castling_rights.white_queenside = false;
+                    self.castling_rights.white_kingside = false;
+                },
+                "a8" => self.castling_rights.black_queenside = false,
+                "h8" => self.castling_rights.black_kingside = false,
+                "e8" => {
+                    self.castling_rights.black_queenside = false;
+                    self.castling_rights.black_kingside = false;
+                }
+                _ => {}
+            }
+            match &m[2..4] { // Rook was captured (so it can't castle)
+                "a1" => self.castling_rights.white_queenside = false,
+                "h1" => self.castling_rights.white_kingside = false,
+                "a8" => self.castling_rights.black_queenside = false,
+                "h8" => self.castling_rights.black_kingside = false,
+                _ => {}
             }
             self.print_board();
         }
