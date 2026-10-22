@@ -1,5 +1,6 @@
 mod board;
 mod uci;
+mod movegen;
 
 use crate::board::Bitboards;
 
