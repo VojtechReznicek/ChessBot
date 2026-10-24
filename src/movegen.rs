@@ -1,4 +1,5 @@
 use crate::board::{Bitboards, B, N, P, R, Q, K, p, n, b, r, q, k, SideToMove};
+use crate::movespreloader::{KNIGHT_ATTACKS, KING_ATTACKS};
 
 struct Move{
     from: u8,
@@ -22,103 +23,47 @@ pub fn generate_moves(board: &Bitboards) -> Vec<Move> {
     moves
 }
 
-fn generate_knight_moves(board: &Bitboards, _white_pieces: u64, _black_pieces: u64) -> Vec<Move> {
+fn generate_knight_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64) -> Vec<Move> {
     let mut knight_moves = Vec::new();
 
 
     if board.side_to_move == SideToMove::White{
         let mut white_knights = board.pieces[N];
         while white_knights != 0 {
-            let _knight_square = white_knights.trailing_zeros() as u8;
-
+            let knight_square = white_knights.trailing_zeros() as u8;
+            let mut legal_moves_mask = KNIGHT_ATTACKS[knight_square as usize] & !white_pieces;  // This ignores getting the knight into a check
+            while legal_moves_mask != 0 {
+                let to_index = legal_moves_mask.trailing_zeros() as u8;
+                knight_moves.push(Move {
+                    from: knight_square,
+                    to: to_index,
+                    flag: Flag::Normal
+                });
+                legal_moves_mask &= legal_moves_mask - 1;
+            }
             white_knights &= white_knights - 1;
         }
     }
     else {
         let mut black_knights = board.pieces[n];
         while black_knights != 0 {
-            let _knight_square = black_knights.trailing_zeros() as u8;
-
+            let knight_square = black_knights.trailing_zeros() as u8;
+            let mut legal_moves_mask = KNIGHT_ATTACKS[knight_square as usize] & !black_pieces;  // This ignores getting the knight into a check
+            while legal_moves_mask != 0 {
+                let to_index = legal_moves_mask.trailing_zeros() as u8;
+                knight_moves.push(Move {
+                    from: knight_square,
+                    to: to_index,
+                    flag: Flag::Normal
+                });
+                legal_moves_mask &= legal_moves_mask - 1;
+            }
             black_knights &= black_knights - 1;
         }
     }
-
 
     knight_moves
 }
 
 
-// I'm doing this in compile time :3
-pub const KNIGHT_ATTACKS: [u64; 64] = init_knight_attacks();
-const fn init_knight_attacks() -> [u64; 64] {
-    let mut table: [u64; 64] = [0; 64];
-    let mut i: usize = 0;
-    while i < 64 {
-        let mut attacks: u64 = 0;
-        let row = i / 8;
-        let col = i % 8;
 
-        attacks = attacks | if row > 1 { // able to do vertical moves (down)
-            let down_and_right = if col < 7 {
-                1u64 << (i - 8 * 2 + 1)
-            }
-            else { 0 };
-
-            let down_and_left = if col > 0 {
-                1u64 << (i - 8 * 2 - 1)
-            }
-            else { 0 };
-            down_and_right | down_and_left
-        }
-        else {
-            0
-        };
-        attacks = attacks | if row < 6 { // able to do vertical moves (up)
-            let up_and_right = if col < 7 {
-                1u64 << (i + 8 * 2 + 1)
-            }
-            else { 0 };
-
-            let up_and_left = if col > 0 {
-                1u64 << (i + 8 * 2 - 1)
-            }
-            else { 0 };
-            up_and_right | up_and_left
-
-        }
-        else { 0 };
-
-        attacks = attacks | if col > 1 { // able to do horizontal moves (left)
-            let left_and_up = if row < 7 {
-                1u64 << (i - 2 + 8)
-            }
-            else { 0 };
-            let left_and_down = if row > 0 {
-                1u64 << (i - 2 - 8)
-            }
-            else { 0 };
-            left_and_up | left_and_down
-        }
-        else { 0 };
-        attacks = attacks | if col < 6 { // able to do horizontal moves (right)
-            let right_and_up = if row < 7 {
-                1u64 << (i + 2 + 8)
-            }
-            else { 0 };
-            let right_and_down = if row > 0 {
-                1u64 << (i + 2 - 8)
-            }
-            else { 0 };
-            right_and_up | right_and_down
-        }
-        else { 0 };
-
-
-        table[i] = attacks;
-        i += 1;
-    }
-    table
-}
-
-// +- 8*2 +- 1    for vertical attacks
-// +- 2 +- 8      for horizontal attacks
