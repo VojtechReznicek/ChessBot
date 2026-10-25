@@ -1,14 +1,14 @@
 use crate::board::{Bitboards, B, N, P, R, Q, K, p, n, b, r, q, k, SideToMove, CastlingRights};
 use crate::movespreloader::{KNIGHT_ATTACKS, KING_ATTACKS};
 
-struct Move{
-    from: u8,
-    to: u8,
-    flag: Flag,
+pub struct Move{
+    pub(crate) from: u8,
+    pub(crate) to: u8,
+    pub(crate) flag: Flag,
 }
 
 #[repr(u8)]
-enum Flag {
+pub enum Flag {
     Normal,
     Promote,
     Castle,
