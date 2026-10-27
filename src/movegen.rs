@@ -1,5 +1,10 @@
-use crate::board::{Bitboards, B, N, P, R, Q, K, p, n, b, r, q, k, SideToMove, CastlingRights};
+use crate::board::{Bitboards, B, N, P, R, Q, K, p, n, b, r, q, k, SideToMove};
 use crate::movespreloader::{KNIGHT_ATTACKS, KING_ATTACKS};
+pub const RANK_2: u64 = 0x000000000000FF00;
+pub const RANK_7: u64 = 0x00FF000000000000;
+pub const FILE_A: u64 = 0x0101010101010101;
+pub const FILE_H: u64 = 0x8080808080808080;
+
 
 pub struct Move{
     pub(crate) from: u8,
@@ -12,6 +17,7 @@ pub enum Flag {
     Normal,
     Promote,
     Castle,
+    DoublePush,
 }
 
 pub fn generate_moves(board: &Bitboards) -> Vec<Move> {
@@ -21,6 +27,7 @@ pub fn generate_moves(board: &Bitboards) -> Vec<Move> {
     let occupancy = white_pieces | black_pieces;
     moves.append(&mut generate_knight_moves(board, white_pieces, black_pieces));
     moves.append(&mut generate_king_moves(board, white_pieces, black_pieces, occupancy));
+    moves.append(&mut generate_pawn_moves(board, black_pieces));
     moves
 }
 
@@ -152,4 +159,37 @@ fn generate_king_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64, 
     }
 
     king_moves
+}
+
+fn generate_pawn_moves(board: &Bitboards, occupancy: u64) -> Vec<Move> {
+    let mut pawn_moves = Vec::new();
+    if board.side_to_move == SideToMove::White{
+        let white_pawns = board.pieces[P];
+        let mut basic_moves_mask = white_pawns << 8 & !occupancy;
+        let mut twostep_mask = (((white_pawns & RANK_2) << 8) & !occupancy ) << 8 & !occupancy;
+        while basic_moves_mask != 0 {
+            let to_index = basic_moves_mask.trailing_zeros() as u8;
+            pawn_moves.push(Move{
+                from: to_index - 8,
+                to: to_index,
+                flag: Flag::Normal,
+            });
+            basic_moves_mask &= basic_moves_mask - 1;
+        }
+        while twostep_mask != 0 {
+            let to_index = twostep_mask.trailing_zeros() as u8;
+            pawn_moves.push(Move{
+                from: to_index - 16,
+                to: to_index,
+                flag: Flag::DoublePush,
+            });
+            twostep_mask &= twostep_mask - 1;
+        }
+
+    }
+    else {
+
+    }
+
+    pawn_moves
 }
