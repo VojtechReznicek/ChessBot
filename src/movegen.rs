@@ -1,4 +1,4 @@
-use crate::board::{Bitboards, B, N, P, R, Q, K, p, n, b, r, q, k, SideToMove};
+use crate::board::{Bitboards, B, N, P, R, Q, K, p, n, b, r, q, k, SideToMove,};
 use crate::movespreloader::{KNIGHT_ATTACKS, KING_ATTACKS};
 pub const RANK_2: u64 = 0x000000000000FF00;
 pub const RANK_7: u64 = 0x00FF000000000000;
@@ -18,6 +18,7 @@ pub enum Flag {
     Promote,
     Castle,
     DoublePush,
+    Capture,
 }
 
 pub fn generate_moves(board: &Bitboards) -> Vec<Move> {
@@ -27,7 +28,7 @@ pub fn generate_moves(board: &Bitboards) -> Vec<Move> {
     let occupancy = white_pieces | black_pieces;
     moves.append(&mut generate_knight_moves(board, white_pieces, black_pieces));
     moves.append(&mut generate_king_moves(board, white_pieces, black_pieces, occupancy));
-    moves.append(&mut generate_pawn_moves(board, black_pieces));
+    moves.append(&mut generate_pawn_moves(board, black_pieces, white_pieces, occupancy));
     moves
 }
 
@@ -161,7 +162,7 @@ fn generate_king_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64, 
     king_moves
 }
 
-fn generate_pawn_moves(board: &Bitboards, occupancy: u64) -> Vec<Move> {
+fn generate_pawn_moves(board: &Bitboards, black_pieces: u64, white_pieces: u64, occupancy: u64) -> Vec<Move> {
     let mut pawn_moves = Vec::new();
     if board.side_to_move == SideToMove::White{
         let white_pawns = board.pieces[P];
@@ -186,10 +187,77 @@ fn generate_pawn_moves(board: &Bitboards, occupancy: u64) -> Vec<Move> {
             twostep_mask &= twostep_mask - 1;
         }
 
+        let mut left_attacks_mask = ((white_pawns & !FILE_A) << 7) & black_pieces;
+        let mut right_attacks_mask = ((white_pawns & !FILE_H) << 9) & black_pieces;
+        while left_attacks_mask != 0 {
+            let to_index = left_attacks_mask.trailing_zeros() as u8;
+            pawn_moves.push(Move{
+                from: to_index - 7,
+                to: to_index,
+                flag: Flag::Capture,
+            });
+            left_attacks_mask &= left_attacks_mask - 1;
+
+        }
+        while right_attacks_mask != 0 {
+            let to_index = right_attacks_mask.trailing_zeros() as u8;
+            pawn_moves.push(Move{
+                from: to_index - 9,
+                to: to_index,
+                flag: Flag::Capture,
+            });
+            right_attacks_mask &= right_attacks_mask - 1;
+        }
     }
     else {
+        let black_pawns = board.pieces[p];
+        let mut basic_moves_mask = black_pawns >> 8 & !occupancy;
+        let mut twostep_mask = (((black_pawns & RANK_7) >> 8) & !occupancy ) >> 8 & !occupancy;
 
+        while basic_moves_mask != 0 {
+            let to_index = basic_moves_mask.trailing_zeros() as u8;
+            pawn_moves.push(Move{
+                from: to_index + 8,
+                to: to_index,
+                flag: Flag::Normal,
+            });
+            basic_moves_mask &= basic_moves_mask - 1;
+        }
+
+        while twostep_mask != 0 {
+            let to_index = twostep_mask.trailing_zeros() as u8;
+            pawn_moves.push(Move{
+                from: to_index + 16,
+                to: to_index,
+                flag: Flag::DoublePush,
+            });
+            twostep_mask &= twostep_mask - 1;
+        }
+
+        let mut left_attacks_mask = ((black_pawns & !FILE_H) >> 7) & white_pieces;
+        let mut right_attacks_mask = ((black_pawns & !FILE_A) >> 9) & white_pieces;
+
+        while left_attacks_mask != 0 {
+            let to_index = left_attacks_mask.trailing_zeros() as u8;
+            pawn_moves.push(Move{
+                from: to_index + 7,
+                to: to_index,
+                flag: Flag::Capture,
+            });
+            left_attacks_mask &= left_attacks_mask - 1;
+        }
+
+        while right_attacks_mask != 0 {
+            let to_index = right_attacks_mask.trailing_zeros() as u8;
+            pawn_moves.push(Move{
+                from: to_index + 9,
+                to: to_index,
+                flag: Flag::Capture,
+            });
+            right_attacks_mask &= right_attacks_mask - 1;
+        }
     }
+
 
     pawn_moves
 }

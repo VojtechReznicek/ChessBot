@@ -53,6 +53,7 @@ pub fn print_generated_moves(moves: &Vec<Move>) {
             Flag::Castle => " [Castle]",
             Flag::Promote => " [Promote]",
             Flag::DoublePush => " [DoublePush]",
+            Flag::Capture => " [Capture]",
         };
 
         println!("{}{}{}", from_sq, to_sq, flag_suffix);
