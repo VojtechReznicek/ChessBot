@@ -51,9 +51,17 @@ pub fn print_generated_moves(moves: &Vec<Move>) {
         let flag_suffix = match m.flag {
             Flag::Normal => "",
             Flag::Castle => " [Castle]",
-            Flag::Promote => " [Promote]",
             Flag::DoublePush => " [DoublePush]",
             Flag::Capture => " [Capture]",
+            Flag::PromoteQueen => " [PromoteQueen]",
+            Flag::PromoteRook => " [PromoteRook]",
+            Flag::PromoteBishop => " [PromoteBishop]",
+            Flag::PromoteKnight => " [PromoteKnight]",
+            Flag::PromoteQueenCapture => " [PromoteQueenCapture]",
+            Flag::PromoteRookCapture => " [PromoteRookCapture]",
+            Flag::PromoteBishopCapture => " [PromoteBishopCapture]",
+            Flag::PromoteKnightCapture => " [PromoteKnightCapture]",
+            Flag::EnPassant => " [EnPassant]",
         };
 
         println!("{}{}{}", from_sq, to_sq, flag_suffix);

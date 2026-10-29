@@ -15,6 +15,7 @@ pub const k: usize = 11;
 
 pub struct Bitboards {
     pub pieces: [u64; 12],
+    pub en_passant_mask: u64,
     pub side_to_move: SideToMove,
     pub castling_rights: CastlingRights,
     pub halfmove_clock: u8,
@@ -58,7 +59,8 @@ impl Bitboards {
             black_kingside: true,
         };
         let mut halfmove_clock = 0;
-        Self { pieces, side_to_move, castling_rights, halfmove_clock }
+        let mut en_passant_mask = 0;
+        Self { pieces, side_to_move, castling_rights, halfmove_clock, en_passant_mask }
     }
 
     pub fn print_board(&self) {
@@ -89,6 +91,7 @@ impl Bitboards {
 
 
     pub fn make_moves(&mut self, moves: &[String]) {
+
         if moves.len() % 2 == 0 {
             self.side_to_move = SideToMove::White;
         }
@@ -102,6 +105,7 @@ impl Bitboards {
 
             let move_mask = from_mask | to_mask;
 
+            self.en_passant_mask = 0;
 
             if m.len() == 5 {  // Promoting
                 for i in 0..12 {
@@ -161,6 +165,14 @@ impl Bitboards {
                 for i in 0..12 { // The move
                     if (self.pieces[i] & from_mask) != 0 {
                         self.pieces[i] ^= move_mask;
+                        if (i == P || i == p) && from_mask.trailing_zeros().abs_diff(to_mask.trailing_zeros()) == 16 {
+                            if i == p {
+                                self.en_passant_mask = to_mask << 8;
+                            }
+                            else {
+                                self.en_passant_mask = to_mask >> 8;
+                            }
+                        }
                         break;
                     }
                 }

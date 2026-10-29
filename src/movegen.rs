@@ -15,10 +15,18 @@ pub struct Move{
 #[repr(u8)]
 pub enum Flag {
     Normal,
-    Promote,
+    PromoteQueen,
+    PromoteRook,
+    PromoteBishop,
+    PromoteKnight,
+    PromoteQueenCapture,
+    PromoteRookCapture,
+    PromoteBishopCapture,
+    PromoteKnightCapture,
     Castle,
     DoublePush,
     Capture,
+    EnPassant,
 }
 
 pub fn generate_moves(board: &Bitboards) -> Vec<Move> {
@@ -40,8 +48,10 @@ fn generate_knight_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64
         let mut white_knights = board.pieces[N];
         while white_knights != 0 {
             let knight_square = white_knights.trailing_zeros() as u8;
-            let mut legal_moves_mask = KNIGHT_ATTACKS[knight_square as usize] & !white_pieces;  // This ignores getting the king into a check
-            while legal_moves_mask != 0 {
+            let mut legal_moves_mask = KNIGHT_ATTACKS[knight_square as usize] & !white_pieces;
+            let mut legal_captures_mask = legal_moves_mask & black_pieces;
+            legal_moves_mask &= !black_pieces;
+            while legal_moves_mask != 0 {  // Without capture
                 let to_index = legal_moves_mask.trailing_zeros() as u8;
                 knight_moves.push(Move {
                     from: knight_square,
@@ -50,6 +60,15 @@ fn generate_knight_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64
                 });
                 legal_moves_mask &= legal_moves_mask - 1;
             }
+            while legal_captures_mask != 0 {
+                let to_index = legal_captures_mask.trailing_zeros() as u8;
+                knight_moves.push(Move{
+                    from: knight_square,
+                    to: to_index,
+                    flag: Flag::Capture
+                })
+            }
+
             white_knights &= white_knights - 1;
         }
     }
@@ -57,7 +76,9 @@ fn generate_knight_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64
         let mut black_knights = board.pieces[n];
         while black_knights != 0 {
             let knight_square = black_knights.trailing_zeros() as u8;
-            let mut legal_moves_mask = KNIGHT_ATTACKS[knight_square as usize] & !black_pieces;  // This ignores getting the king into a check
+            let mut legal_moves_mask = KNIGHT_ATTACKS[knight_square as usize] & !black_pieces;
+            let mut legal_captures_mask = legal_moves_mask & white_pieces;
+            legal_moves_mask &= !white_pieces;
             while legal_moves_mask != 0 {
                 let to_index = legal_moves_mask.trailing_zeros() as u8;
                 knight_moves.push(Move {
@@ -67,6 +88,15 @@ fn generate_knight_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64
                 });
                 legal_moves_mask &= legal_moves_mask - 1;
             }
+            while legal_captures_mask != 0 {
+                let to_index = legal_captures_mask.trailing_zeros() as u8;
+                knight_moves.push(Move{
+                    from: knight_square,
+                    to: to_index,
+                    flag: Flag::Capture
+                })
+            }
+
             black_knights &= black_knights - 1;
         }
     }
@@ -83,7 +113,8 @@ fn generate_king_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64, 
         while white_kings != 0 {
             let king_square = white_kings.trailing_zeros() as u8;
             let mut legal_moves_mask = KING_ATTACKS[king_square as usize] & !white_pieces;  // This ignores getting the king into a check
-
+            let mut legal_captures_mask = legal_moves_mask & black_pieces;
+            legal_moves_mask &= !black_pieces;
             while legal_moves_mask != 0 {
                 let to_index = legal_moves_mask.trailing_zeros() as u8;
                 king_moves.push(Move { // Normal king move
@@ -92,6 +123,14 @@ fn generate_king_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64, 
                     flag: Flag::Normal
                 });
                 legal_moves_mask &= legal_moves_mask - 1;
+            }
+            while legal_captures_mask != 0 {
+                let to_index = legal_captures_mask.trailing_zeros() as u8;
+                king_moves.push(Move{
+                    from: king_square,
+                    to: to_index,
+                    flag: Flag::Capture
+                })
             }
 
             if king_square == 4 { // Castle
@@ -124,7 +163,8 @@ fn generate_king_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64, 
         while black_kings != 0 {
             let king_square = black_kings.trailing_zeros() as u8;
             let mut legal_moves_mask = KING_ATTACKS[king_square as usize] & !black_pieces;
-
+            let mut legal_captures_mask = legal_moves_mask & white_pieces;
+            legal_moves_mask &= !white_pieces;
             while legal_moves_mask != 0 { // Normal king move
                 let to_index = legal_moves_mask.trailing_zeros() as u8;
                 king_moves.push(Move {
@@ -133,6 +173,14 @@ fn generate_king_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64, 
                     flag: Flag::Normal
                 });
                 legal_moves_mask &= legal_moves_mask - 1;
+            }
+            while legal_captures_mask != 0 {
+                let to_index = legal_captures_mask.trailing_zeros() as u8;
+                king_moves.push(Move{
+                    from: king_square,
+                    to: to_index,
+                    flag: Flag::Capture
+                })
             }
 
             if king_square == 60 { // Castle
@@ -170,16 +218,25 @@ fn generate_pawn_moves(board: &Bitboards, black_pieces: u64, white_pieces: u64, 
         let mut twostep_mask = (((white_pawns & RANK_2) << 8) & !occupancy ) << 8 & !occupancy;
         while basic_moves_mask != 0 {
             let to_index = basic_moves_mask.trailing_zeros() as u8;
-            pawn_moves.push(Move{
-                from: to_index - 8,
-                to: to_index,
-                flag: Flag::Normal,
-            });
+            if to_index > 55 {   // Promoting
+                pawn_moves.push(Move { from: to_index - 8, to: to_index, flag: Flag::PromoteQueen });
+                pawn_moves.push(Move { from: to_index - 8, to: to_index, flag: Flag::PromoteRook });
+                pawn_moves.push(Move { from: to_index - 8, to: to_index, flag: Flag::PromoteBishop });
+                pawn_moves.push(Move { from: to_index - 8, to: to_index, flag: Flag::PromoteKnight });
+            }
+            else {
+                pawn_moves.push(Move {
+                    from: to_index - 8,
+                    to: to_index,
+                    flag: Flag::Normal,
+                });
+            }
+
             basic_moves_mask &= basic_moves_mask - 1;
         }
         while twostep_mask != 0 {
             let to_index = twostep_mask.trailing_zeros() as u8;
-            pawn_moves.push(Move{
+            pawn_moves.push(Move {
                 from: to_index - 16,
                 to: to_index,
                 flag: Flag::DoublePush,
@@ -189,44 +246,88 @@ fn generate_pawn_moves(board: &Bitboards, black_pieces: u64, white_pieces: u64, 
 
         let mut left_attacks_mask = ((white_pawns & !FILE_A) << 7) & black_pieces;
         let mut right_attacks_mask = ((white_pawns & !FILE_H) << 9) & black_pieces;
-        while left_attacks_mask != 0 {
+        while left_attacks_mask != 0 { // Capture
             let to_index = left_attacks_mask.trailing_zeros() as u8;
-            pawn_moves.push(Move{
-                from: to_index - 7,
-                to: to_index,
-                flag: Flag::Capture,
-            });
+            if to_index > 55 {   // Promoting
+                pawn_moves.push(Move { from: to_index - 7, to: to_index, flag: Flag::PromoteQueenCapture });
+                pawn_moves.push(Move { from: to_index - 7, to: to_index, flag: Flag::PromoteRookCapture });
+                pawn_moves.push(Move { from: to_index - 7, to: to_index, flag: Flag::PromoteBishopCapture });
+                pawn_moves.push(Move { from: to_index - 7, to: to_index, flag: Flag::PromoteKnightCapture });
+            }
+            else {
+                pawn_moves.push(Move {
+                    from: to_index - 7,
+                    to: to_index,
+                    flag: Flag::Capture,
+                });
+            }
+
             left_attacks_mask &= left_attacks_mask - 1;
 
         }
-        while right_attacks_mask != 0 {
+        while right_attacks_mask != 0 { // Capture
             let to_index = right_attacks_mask.trailing_zeros() as u8;
+            if to_index > 55 {   // Promoting
+                pawn_moves.push(Move { from: to_index - 9, to: to_index, flag: Flag::PromoteQueenCapture });
+                pawn_moves.push(Move { from: to_index - 9, to: to_index, flag: Flag::PromoteRookCapture });
+                pawn_moves.push(Move { from: to_index - 9, to: to_index, flag: Flag::PromoteBishopCapture });
+                pawn_moves.push(Move { from: to_index - 9, to: to_index, flag: Flag::PromoteKnightCapture });
+            }
+            else {
+                pawn_moves.push(Move {
+                    from: to_index - 9,
+                    to: to_index,
+                    flag: Flag::Capture,
+                });
+            }
+            right_attacks_mask &= right_attacks_mask - 1;
+        }
+
+
+        if board.en_passant_mask >> 7 & (white_pawns & !FILE_A) != 0 {
+           let to_index = board.en_passant_mask.trailing_zeros() as u8;
+            pawn_moves.push(Move{
+                from: to_index - 7,
+                to: to_index,
+                flag: Flag::EnPassant,
+            })
+        }
+        if board.en_passant_mask >> 9 & (white_pawns & !FILE_H) != 0 {
+            let to_index = board.en_passant_mask.trailing_zeros() as u8;
             pawn_moves.push(Move{
                 from: to_index - 9,
                 to: to_index,
-                flag: Flag::Capture,
-            });
-            right_attacks_mask &= right_attacks_mask - 1;
+                flag: Flag::EnPassant,
+            })
         }
+
     }
-    else {
+    else { // Black
         let black_pawns = board.pieces[p];
         let mut basic_moves_mask = black_pawns >> 8 & !occupancy;
         let mut twostep_mask = (((black_pawns & RANK_7) >> 8) & !occupancy ) >> 8 & !occupancy;
 
         while basic_moves_mask != 0 {
             let to_index = basic_moves_mask.trailing_zeros() as u8;
-            pawn_moves.push(Move{
-                from: to_index + 8,
-                to: to_index,
-                flag: Flag::Normal,
-            });
+            if to_index < 8 {   // Promoting
+                pawn_moves.push(Move { from: to_index + 8, to: to_index, flag: Flag::PromoteQueen });
+                pawn_moves.push(Move { from: to_index + 8, to: to_index, flag: Flag::PromoteRook });
+                pawn_moves.push(Move { from: to_index + 8, to: to_index, flag: Flag::PromoteBishop });
+                pawn_moves.push(Move { from: to_index + 8, to: to_index, flag: Flag::PromoteKnight });
+            }
+            else {
+                pawn_moves.push(Move {
+                    from: to_index + 8,
+                    to: to_index,
+                    flag: Flag::Normal,
+                });
+            }
             basic_moves_mask &= basic_moves_mask - 1;
         }
 
         while twostep_mask != 0 {
             let to_index = twostep_mask.trailing_zeros() as u8;
-            pawn_moves.push(Move{
+            pawn_moves.push(Move {
                 from: to_index + 16,
                 to: to_index,
                 flag: Flag::DoublePush,
@@ -237,27 +338,60 @@ fn generate_pawn_moves(board: &Bitboards, black_pieces: u64, white_pieces: u64, 
         let mut left_attacks_mask = ((black_pawns & !FILE_H) >> 7) & white_pieces;
         let mut right_attacks_mask = ((black_pawns & !FILE_A) >> 9) & white_pieces;
 
-        while left_attacks_mask != 0 {
+        while left_attacks_mask != 0 { // Capture
             let to_index = left_attacks_mask.trailing_zeros() as u8;
-            pawn_moves.push(Move{
-                from: to_index + 7,
-                to: to_index,
-                flag: Flag::Capture,
-            });
+            if to_index < 8 {   // Promoting
+                pawn_moves.push(Move { from: to_index + 7, to: to_index, flag: Flag::PromoteQueenCapture });
+                pawn_moves.push(Move { from: to_index + 7, to: to_index, flag: Flag::PromoteRookCapture });
+                pawn_moves.push(Move { from: to_index + 7, to: to_index, flag: Flag::PromoteBishopCapture });
+                pawn_moves.push(Move { from: to_index + 7, to: to_index, flag: Flag::PromoteKnightCapture });
+            }
+            else {
+                pawn_moves.push(Move {
+                    from: to_index + 7,
+                    to: to_index,
+                    flag: Flag::Capture,
+                });
+            }
             left_attacks_mask &= left_attacks_mask - 1;
         }
 
-        while right_attacks_mask != 0 {
+        while right_attacks_mask != 0 { // Capture
             let to_index = right_attacks_mask.trailing_zeros() as u8;
+            if to_index < 8 {   // Promoting
+                pawn_moves.push(Move { from: to_index + 9, to: to_index, flag: Flag::PromoteQueenCapture });
+                pawn_moves.push(Move { from: to_index + 9, to: to_index, flag: Flag::PromoteRookCapture });
+                pawn_moves.push(Move { from: to_index + 9, to: to_index, flag: Flag::PromoteBishopCapture });
+                pawn_moves.push(Move { from: to_index + 9, to: to_index, flag: Flag::PromoteKnightCapture });
+            }
+            else {
+                pawn_moves.push(Move {
+                    from: to_index + 9,
+                    to: to_index,
+                    flag: Flag::Capture,
+                });
+            }
+            right_attacks_mask &= right_attacks_mask - 1;
+        }
+        if board.en_passant_mask << 7 & (black_pawns & !FILE_H) != 0 {
+            let to_index = board.en_passant_mask.trailing_zeros() as u8;
+            pawn_moves.push(Move{
+                from: to_index + 7,
+                to: to_index,
+                flag: Flag::EnPassant,
+            })
+        }
+        if board.en_passant_mask << 9 & (black_pawns & !FILE_A) != 0 {
+            let to_index = board.en_passant_mask.trailing_zeros() as u8;
             pawn_moves.push(Move{
                 from: to_index + 9,
                 to: to_index,
-                flag: Flag::Capture,
-            });
-            right_attacks_mask &= right_attacks_mask - 1;
+                flag: Flag::EnPassant,
+            })
         }
-    }
 
+    }
 
     pawn_moves
 }
+

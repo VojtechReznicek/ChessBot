@@ -1,5 +1,5 @@
 use crate::board::Bitboards;
-use crate::{index_to_algebraic, main, print_generated_moves};
+use crate::{index_to_algebraic, print_generated_moves};
 
 pub fn parse_uci(input: &[String], board: &mut Bitboards) {
     match input[0].as_str() {
@@ -31,7 +31,10 @@ pub fn parse_uci(input: &[String], board: &mut Bitboards) {
                 let to_sq = index_to_algebraic(first_move.to);
 
                 let flag_char = match first_move.flag {
-                    crate::movegen::Flag::Promote => "q", 
+                    crate::movegen::Flag::PromoteQueen | crate::movegen::Flag::PromoteQueenCapture => "q",
+                    crate::movegen::Flag::PromoteRook | crate::movegen::Flag::PromoteRookCapture => "r",
+                    crate::movegen::Flag::PromoteBishop | crate::movegen::Flag::PromoteBishopCapture => "b",
+                    crate::movegen::Flag::PromoteKnight | crate::movegen::Flag::PromoteKnightCapture => "n",
                     _ => "",
                 };
 
