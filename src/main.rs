@@ -1,13 +1,23 @@
+//! This is the main file with the main loop
+
 mod board;
 mod uci;
 mod movegen;
 mod movespreloader;
 
-use crate::board::Bitboards;
-use crate::movegen::{Flag, Move};
+use crate::board::GameState;
+use crate::uci::get_input;
+
 
 fn main() {
-    let mut board = Bitboards::new();
+    let args = std::env::args().collect::<Vec<String>>();
+    let mut ascii_mode = false;
+    for i in 1..args.len() {
+        if args[i] == "--ascii" {
+            ascii_mode = true;
+        }
+    }
+    let mut board = GameState::new();
 
     loop {
         let input = get_input();
@@ -15,56 +25,7 @@ fn main() {
         if input.is_empty() {
             continue;
         }
-        uci::parse_uci(&input, &mut board);
-    }
-}
-
-pub fn get_input() -> Vec<String> {
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input).unwrap();
-    input.split_whitespace().map(|s| s.to_string()).collect()
-}
-
-
-
-
-
-
-
-fn index_to_algebraic(index: u8) -> String {
-    let col = index % 8;
-    let row = index / 8;
-
-    let file = (b'a' + col) as char;
-    let rank = (b'1' + row) as char;
-
-    format!("{}{}", file, rank)
-}
-
-pub fn print_generated_moves(moves: &Vec<Move>) {
-    println!("--- Generated {} pseudo-legal moves ---", moves.len());
-
-    for m in moves {
-        let from_sq = index_to_algebraic(m.from);
-        let to_sq = index_to_algebraic(m.to);
-
-        let flag_suffix = match m.flag {
-            Flag::Normal => "",
-            Flag::Castle => " [Castle]",
-            Flag::DoublePush => " [DoublePush]",
-            Flag::Capture => " [Capture]",
-            Flag::PromoteQueen => " [PromoteQueen]",
-            Flag::PromoteRook => " [PromoteRook]",
-            Flag::PromoteBishop => " [PromoteBishop]",
-            Flag::PromoteKnight => " [PromoteKnight]",
-            Flag::PromoteQueenCapture => " [PromoteQueenCapture]",
-            Flag::PromoteRookCapture => " [PromoteRookCapture]",
-            Flag::PromoteBishopCapture => " [PromoteBishopCapture]",
-            Flag::PromoteKnightCapture => " [PromoteKnightCapture]",
-            Flag::EnPassant => " [EnPassant]",
-        };
-
-        println!("{}{}{}", from_sq, to_sq, flag_suffix);
+        uci::parse_uci(&input, &mut board, ascii_mode);
     }
 }
 

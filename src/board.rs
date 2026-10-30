@@ -1,5 +1,10 @@
-#![allow(non_upper_case_globals)]
+//! This module manages all the information about the current game state (chess board and some data for specific chess rules like castling, en passant etc.)
+//! and also the functions for making changes on this structure
+//! The chess board is represented as 12 bitboards each for one of the 6 types of pieces for both black and white
+//! Bitboard is an u64 number where each bit is one square on the board and 1 means the square is occupied by the specific piece, otherwise it's empty
+//! This lets me use masks and superfast bitwise operations for moving the pieces (deleting and/or appending them on the board)
 
+#![allow(non_upper_case_globals)]
 pub const P: usize = 0;
 pub const N: usize = 1;
 pub const B: usize = 2;
@@ -13,8 +18,10 @@ pub const r: usize = 9;
 pub const q: usize = 10;
 pub const k: usize = 11;
 
-pub struct Bitboards {
-    pub pieces: [u64; 12],
+/// The main structure containing all important information about the current game state
+pub struct GameState {
+    /// The current board position
+    pub bitboards: [u64; 12],
     pub en_passant_mask: u64,
     pub side_to_move: SideToMove,
     pub castling_rights: CastlingRights,
@@ -33,7 +40,7 @@ pub struct CastlingRights {
     pub black_queenside: bool,
 }
 
-impl Bitboards {
+impl GameState {
     pub fn new() -> Self {
         let mut pieces = [0; 12];
 
@@ -51,43 +58,17 @@ impl Bitboards {
         pieces[q] = 0x0800_0000_0000_0000;
         pieces[k] = 0x1000_0000_0000_0000;
 
-        let mut side_to_move = SideToMove::White;
-        let mut castling_rights= CastlingRights{
+        let side_to_move = SideToMove::White;
+        let castling_rights= CastlingRights{
             white_queenside: true,
             white_kingside: true,
             black_queenside: true,
             black_kingside: true,
         };
-        let mut halfmove_clock = 0;
-        let mut en_passant_mask = 0;
-        Self { pieces, side_to_move, castling_rights, halfmove_clock, en_passant_mask }
+        let halfmove_clock = 0;
+        let en_passant_mask = 0;
+        Self { bitboards: pieces, side_to_move, castling_rights, halfmove_clock, en_passant_mask }
     }
-
-    pub fn print_board(&self) {
-        println!("  a b c d e f g h");
-
-        let piece_chars = ['P', 'N', 'B', 'R', 'Q', 'K', 'p', 'n', 'b', 'r', 'q', 'k'];
-
-        for row in (0..8).rev() {
-            print!("{} ", row + 1);
-            for col in 0..8 {
-                let index = row * 8 + col;
-                let mask = 1u64 << index;
-                let mut current_piece = '.';
-
-                for i in 0..12 {
-                    if (self.pieces[i] & mask) != 0 {
-                        current_piece = piece_chars[i];
-                        break;
-                    }
-                }
-                print!("{} ", current_piece);
-            }
-            println!();
-        }
-        println!();
-    }
-
 
 
     pub fn make_moves(&mut self, moves: &[String]) {
@@ -109,14 +90,13 @@ impl Bitboards {
 
             if m.len() == 5 {  // Promoting
                 for i in 0..12 {
-                    if (self.pieces[i] & to_mask) != 0 {   // Capture
-                        self.pieces[i] &= !to_mask;
-                        captured_a_piece = true;
+                    if (self.bitboards[i] & to_mask) != 0 {   // Capture
+                        self.bitboards[i] &= !to_mask;
                         break;
                     }
                 }
-                if (self.pieces[P] & from_mask) != 0 { // White pawn promoting
-                    self.pieces[P] ^= from_mask;
+                if (self.bitboards[P] & from_mask) != 0 { // White pawn promoting
+                    self.bitboards[P] ^= from_mask;
                     let promoting_type = match m.as_bytes()[4] {
                         b'n' => N,
                         b'b' => B,
@@ -124,10 +104,10 @@ impl Bitboards {
                         b'q' => Q,
                         _ => unreachable!()
                     };
-                    self.pieces[promoting_type] ^= to_mask;
+                    self.bitboards[promoting_type] ^= to_mask;
                 }
                 else {    // Black pawn promoting
-                    self.pieces[p] ^= from_mask;
+                    self.bitboards[p] ^= from_mask;
                     let promoting_type = match m.as_bytes()[4] {
                         b'n' => n,
                         b'b' => b,
@@ -135,17 +115,17 @@ impl Bitboards {
                         b'q' => q,
                         _ => unreachable!()
                     };
-                    self.pieces[promoting_type] ^= to_mask;
+                    self.bitboards[promoting_type] ^= to_mask;
                 }
                 self.halfmove_clock = 0;
                 continue;
             }
             else {  // Normal move, castle, En Passant
-                let is_pawn_moving = (self.pieces[P] & from_mask) != 0 || (self.pieces[p] & from_mask) != 0;
+                let is_pawn_moving = (self.bitboards[P] & from_mask) != 0 || (self.bitboards[p] & from_mask) != 0;
 
                 for i in 0..12 {
-                    if (self.pieces[i] & to_mask) != 0 {   // Usual capture
-                        self.pieces[i] &= !to_mask;
+                    if (self.bitboards[i] & to_mask) != 0 {   // Usual capture
+                        self.bitboards[i] &= !to_mask;
                         captured_a_piece = true;
                         self.halfmove_clock = 0;
                         break;
@@ -158,13 +138,13 @@ impl Bitboards {
                     let index = row * 8 + col;
                     let en_passant_capture_mask = 1u64 << index;
 
-                    self.pieces[p] &= !en_passant_capture_mask;
-                    self.pieces[P] &= !en_passant_capture_mask;
+                    self.bitboards[p] &= !en_passant_capture_mask;
+                    self.bitboards[P] &= !en_passant_capture_mask;
                 }
 
                 for i in 0..12 { // The move
-                    if (self.pieces[i] & from_mask) != 0 {
-                        self.pieces[i] ^= move_mask;
+                    if (self.bitboards[i] & from_mask) != 0 {
+                        self.bitboards[i] ^= move_mask;
                         if (i == P || i == p) && from_mask.trailing_zeros().abs_diff(to_mask.trailing_zeros()) == 16 {
                             if i == p {
                                 self.en_passant_mask = to_mask << 8;
@@ -178,10 +158,10 @@ impl Bitboards {
                 }
 
                 match m.as_ref() {  // Castling
-                    "e1g1" => if (self.pieces[K] & to_mask) != 0 { self.make_simple_move("h1f1") },
-                    "e1c1" => if (self.pieces[K] & to_mask) != 0 { self.make_simple_move("a1d1") },
-                    "e8g8" => if (self.pieces[k] & to_mask) != 0 { self.make_simple_move("h8f8") },
-                    "e8c8" => if (self.pieces[k] & to_mask) != 0 { self.make_simple_move("a8d8") },
+                    "e1g1" => if (self.bitboards[K] & to_mask) != 0 { self.make_simple_move("h1f1") },
+                    "e1c1" => if (self.bitboards[K] & to_mask) != 0 { self.make_simple_move("a1d1") },
+                    "e8g8" => if (self.bitboards[k] & to_mask) != 0 { self.make_simple_move("h8f8") },
+                    "e8c8" => if (self.bitboards[k] & to_mask) != 0 { self.make_simple_move("a8d8") },
                     _ => {}
                 }
                 if is_pawn_moving || captured_a_piece {
@@ -214,7 +194,6 @@ impl Bitboards {
                 "h8" => self.castling_rights.black_kingside = false,
                 _ => {}
             }
-            self.print_board();
         }
     }
 
@@ -225,8 +204,8 @@ impl Bitboards {
         let to_mask = square_to_mask(&m[2..4]);
         let move_mask = from_mask | to_mask;
         for i in 0..12 {
-            if (self.pieces[i] & from_mask) != 0 {  // The move
-                self.pieces[i] ^= move_mask;
+            if (self.bitboards[i] & from_mask) != 0 {  // The move
+                self.bitboards[i] ^= move_mask;
                 break;
             }
         }
@@ -234,7 +213,7 @@ impl Bitboards {
 }
 
 /// Makes a bitboard with a single bit from given coordinates
-fn square_to_mask(square: &str) -> u64 {
+pub fn square_to_mask(square: &str) -> u64 {
     let bytes = square.as_bytes();
     let col = bytes[0] - b'a';
     let row = bytes[1] - b'1';
@@ -242,3 +221,14 @@ fn square_to_mask(square: &str) -> u64 {
     1u64 << index
 }
 
+
+/// Converts index of a square to proper chess notation
+pub fn index_to_algebraic(index: u8) -> String {
+    let col = index % 8;
+    let row = index / 8;
+
+    let file = (b'a' + col) as char;
+    let rank = (b'1' + row) as char;
+
+    format!("{}{}", file, rank)
+}

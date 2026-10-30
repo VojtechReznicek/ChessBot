@@ -1,5 +1,12 @@
-// I'm doing this in compile time :3
+//! This module preloads tables for easier move generation (in movegen.rs).
+//! Preloaded table is an array of 64 u64 numbers (masks). So each table uses exactly 512 bytes in the memory.
+//! These tables are made to speed up the move generating process.
+//! Here they are being made in the compile-time in const functions and saved as const variables to not slow up the process in the runtime.
+
+/// Preloaded table of all the possible knight attacks
 pub const KNIGHT_ATTACKS: [u64; 64] = init_knight_attacks();
+
+/// Preloaded table of all the possible king attacks
 pub const KING_ATTACKS: [u64; 64] = init_king_attacks();
 const fn init_knight_attacks() -> [u64; 64] {
     let mut table: [u64; 64] = [0; 64];

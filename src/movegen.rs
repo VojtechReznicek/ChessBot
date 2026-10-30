@@ -1,10 +1,14 @@
-use crate::board::{Bitboards, B, N, P, R, Q, K, p, n, b, r, q, k, SideToMove,};
+//! This module generates all the possible pseudo-legal moves from a given position for the player who moves at the moment.
+//! It uses preloaded tables from movespreloader.rs to run faster.
+//! Valid pseudo-legal moves are saved as a Vec<Move>
+//! Move is a simplified structure for saving moves as indexes (not bitboards) and a flag (that contains data about moves that require any special handling)
+
+use crate::board::{GameState, B, N, P, R, Q, K, p, n, b, r, q, k, SideToMove,};
 use crate::movespreloader::{KNIGHT_ATTACKS, KING_ATTACKS};
 pub const RANK_2: u64 = 0x000000000000FF00;
 pub const RANK_7: u64 = 0x00FF000000000000;
 pub const FILE_A: u64 = 0x0101010101010101;
 pub const FILE_H: u64 = 0x8080808080808080;
-
 
 pub struct Move{
     pub(crate) from: u8,
@@ -29,10 +33,10 @@ pub enum Flag {
     EnPassant,
 }
 
-pub fn generate_moves(board: &Bitboards) -> Vec<Move> {
+pub fn generate_moves(board: &GameState) -> Vec<Move> {
     let mut moves = Vec::new();
-    let white_pieces = board.pieces[P] | board.pieces[N] | board.pieces[B] | board.pieces[R] | board.pieces[Q] | board.pieces[K];
-    let black_pieces = board.pieces[p] | board.pieces[n] | board.pieces[b] | board.pieces[r] | board.pieces[q] | board.pieces[k];
+    let white_pieces = board.bitboards[P] | board.bitboards[N] | board.bitboards[B] | board.bitboards[R] | board.bitboards[Q] | board.bitboards[K];
+    let black_pieces = board.bitboards[p] | board.bitboards[n] | board.bitboards[b] | board.bitboards[r] | board.bitboards[q] | board.bitboards[k];
     let occupancy = white_pieces | black_pieces;
     moves.append(&mut generate_knight_moves(board, white_pieces, black_pieces));
     moves.append(&mut generate_king_moves(board, white_pieces, black_pieces, occupancy));
@@ -40,16 +44,16 @@ pub fn generate_moves(board: &Bitboards) -> Vec<Move> {
     moves
 }
 
-fn generate_knight_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64) -> Vec<Move> {
+fn generate_knight_moves(board: &GameState, white_pieces: u64, black_pieces: u64) -> Vec<Move> {
     let mut knight_moves = Vec::new();
 
 
     if board.side_to_move == SideToMove::White{
-        let mut white_knights = board.pieces[N];
+        let mut white_knights = board.bitboards[N];
         while white_knights != 0 {
             let knight_square = white_knights.trailing_zeros() as u8;
             let mut legal_moves_mask = KNIGHT_ATTACKS[knight_square as usize] & !white_pieces;
-            let mut legal_captures_mask = legal_moves_mask & black_pieces;
+            let legal_captures_mask = legal_moves_mask & black_pieces;
             legal_moves_mask &= !black_pieces;
             while legal_moves_mask != 0 {  // Without capture
                 let to_index = legal_moves_mask.trailing_zeros() as u8;
@@ -66,18 +70,19 @@ fn generate_knight_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64
                     from: knight_square,
                     to: to_index,
                     flag: Flag::Capture
-                })
+                });
+                legal_moves_mask &= legal_moves_mask - 1;
             }
 
             white_knights &= white_knights - 1;
         }
     }
     else {
-        let mut black_knights = board.pieces[n];
+        let mut black_knights = board.bitboards[n];
         while black_knights != 0 {
             let knight_square = black_knights.trailing_zeros() as u8;
             let mut legal_moves_mask = KNIGHT_ATTACKS[knight_square as usize] & !black_pieces;
-            let mut legal_captures_mask = legal_moves_mask & white_pieces;
+            let legal_captures_mask = legal_moves_mask & white_pieces;
             legal_moves_mask &= !white_pieces;
             while legal_moves_mask != 0 {
                 let to_index = legal_moves_mask.trailing_zeros() as u8;
@@ -94,7 +99,8 @@ fn generate_knight_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64
                     from: knight_square,
                     to: to_index,
                     flag: Flag::Capture
-                })
+                });
+                legal_moves_mask &= legal_moves_mask - 1;
             }
 
             black_knights &= black_knights - 1;
@@ -106,14 +112,14 @@ fn generate_knight_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64
 
 
 
-fn generate_king_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64, occupancy: u64) -> Vec<Move> {
+fn generate_king_moves(board: &GameState, white_pieces: u64, black_pieces: u64, occupancy: u64) -> Vec<Move> {
     let mut king_moves = Vec::new();
     if board.side_to_move == SideToMove::White {
-        let mut white_kings = board.pieces[K];
+        let mut white_kings = board.bitboards[K];
         while white_kings != 0 {
             let king_square = white_kings.trailing_zeros() as u8;
             let mut legal_moves_mask = KING_ATTACKS[king_square as usize] & !white_pieces;  // This ignores getting the king into a check
-            let mut legal_captures_mask = legal_moves_mask & black_pieces;
+            let legal_captures_mask = legal_moves_mask & black_pieces;
             legal_moves_mask &= !black_pieces;
             while legal_moves_mask != 0 {
                 let to_index = legal_moves_mask.trailing_zeros() as u8;
@@ -130,7 +136,8 @@ fn generate_king_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64, 
                     from: king_square,
                     to: to_index,
                     flag: Flag::Capture
-                })
+                });
+                legal_moves_mask &= legal_moves_mask - 1;
             }
 
             if king_square == 4 { // Castle
@@ -154,16 +161,15 @@ fn generate_king_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64, 
                 }
             }
 
-
             white_kings &= white_kings - 1;
         }
     }
     else {
-        let mut black_kings = board.pieces[k];
+        let mut black_kings = board.bitboards[k];
         while black_kings != 0 {
             let king_square = black_kings.trailing_zeros() as u8;
             let mut legal_moves_mask = KING_ATTACKS[king_square as usize] & !black_pieces;
-            let mut legal_captures_mask = legal_moves_mask & white_pieces;
+            let legal_captures_mask = legal_moves_mask & white_pieces;
             legal_moves_mask &= !white_pieces;
             while legal_moves_mask != 0 { // Normal king move
                 let to_index = legal_moves_mask.trailing_zeros() as u8;
@@ -180,7 +186,8 @@ fn generate_king_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64, 
                     from: king_square,
                     to: to_index,
                     flag: Flag::Capture
-                })
+                });
+                legal_moves_mask &= legal_moves_mask - 1;
             }
 
             if king_square == 60 { // Castle
@@ -210,10 +217,10 @@ fn generate_king_moves(board: &Bitboards, white_pieces: u64, black_pieces: u64, 
     king_moves
 }
 
-fn generate_pawn_moves(board: &Bitboards, black_pieces: u64, white_pieces: u64, occupancy: u64) -> Vec<Move> {
+fn generate_pawn_moves(board: &GameState, black_pieces: u64, white_pieces: u64, occupancy: u64) -> Vec<Move> {
     let mut pawn_moves = Vec::new();
     if board.side_to_move == SideToMove::White{
-        let white_pawns = board.pieces[P];
+        let white_pawns = board.bitboards[P];
         let mut basic_moves_mask = white_pawns << 8 & !occupancy;
         let mut twostep_mask = (((white_pawns & RANK_2) << 8) & !occupancy ) << 8 & !occupancy;
         while basic_moves_mask != 0 {
@@ -303,7 +310,7 @@ fn generate_pawn_moves(board: &Bitboards, black_pieces: u64, white_pieces: u64, 
 
     }
     else { // Black
-        let black_pawns = board.pieces[p];
+        let black_pawns = board.bitboards[p];
         let mut basic_moves_mask = black_pawns >> 8 & !occupancy;
         let mut twostep_mask = (((black_pawns & RANK_7) >> 8) & !occupancy ) >> 8 & !occupancy;
 

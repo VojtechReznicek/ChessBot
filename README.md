@@ -11,6 +11,10 @@ The engine is developed purely in **Rust**. At its core, it uses **bitboards** (
 ## How to run it
 To compile and run the engine from the source code, ensure you have the Rust toolchain installed and execute:
 
-    cargo run --release
+    cargo run --release 
+
+Or optionally if you want to test it in your console:
+    
+    cargo run --release -- --ascii
 
 *Note: For pre-compiled testing executables and step-by-step CLI instructions, please check the [Releases tab](https://github.com/VojtechReznicek/ChessBot/releases).*
