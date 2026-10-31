@@ -29,7 +29,6 @@ fn main() {
     }
 }
 
-
 /*
 position startpos moves e2e4 a7a6 g1f3 b7b6 f1c4 h7h6
 position startpos moves d2d4 a7a6 b1c3 b7b6 c1f4 h7h6 d1d2 g7g6

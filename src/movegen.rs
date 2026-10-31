@@ -402,3 +402,24 @@ fn generate_pawn_moves(board: &GameState, black_pieces: u64, white_pieces: u64, 
     pawn_moves
 }
 
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_startpos_move_count() {
+        let mut board = GameState::new();
+
+        // White moves (16 pawn pushes + 4 knight jumps)
+        let white_moves = generate_moves(&board);
+        assert_eq!(white_moves.len(), 20, "White must have exactly 20 moves in startpos");
+
+        // Black moves
+        board.side_to_move = SideToMove::Black;
+        let black_moves = generate_moves(&board);
+        assert_eq!(black_moves.len(), 20, "Black must have exactly 20 moves in startpos");
+    }
+}

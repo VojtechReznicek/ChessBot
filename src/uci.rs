@@ -6,6 +6,9 @@ use crate::movegen::{Flag, Move};
 
 
 pub fn parse_uci(input: &[String], board: &mut GameState, ascii_mode: bool) {
+    if input.is_empty() {
+        return;
+    }
     match input[0].as_str() {
         "uci" => {
             println!("id name ChessBot");

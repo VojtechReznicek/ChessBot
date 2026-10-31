@@ -84,7 +84,7 @@ const fn init_knight_attacks() -> [u64; 64] {
 const fn init_king_attacks() -> [u64; 64] {
     let mut table: [u64; 64] = [0; 64];
     let mut i: usize = 0;
-    while i < 64{
+    while i < 64 {
         let mut attacks: u64 = 0;
         let row = i / 8;
         let col = i % 8;
@@ -139,3 +139,25 @@ const fn init_king_attacks() -> [u64; 64] {
 // +- 8 (up and down)
 // +- 1 (right and left)
 // +- 8 +- 1 (diagonals)
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_moves_symetry() {
+        for i in 0..64 {
+            let mut moves = KNIGHT_ATTACKS[i];
+            while moves != 0 {
+                let j = moves.trailing_zeros() as usize;
+                let back = KNIGHT_ATTACKS[j];
+                let res = back & (1u64 << i) != 0;
+                assert_eq!(res, true);
+                moves &= moves - 1;
+            }
+        }
+    }
+
+
+}

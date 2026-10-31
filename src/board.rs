@@ -72,7 +72,6 @@ impl GameState {
 
 
     pub fn make_moves(&mut self, moves: &[String]) {
-
         if moves.len() % 2 == 0 {
             self.side_to_move = SideToMove::White;
         }
@@ -80,6 +79,17 @@ impl GameState {
             self.side_to_move = SideToMove::Black;
         }
         for m in moves {
+
+            let bytes = m.as_bytes();
+            if m.len() != 4 && m.len() != 5 {
+                eprintln!("Invalid move skipped: {}", m);
+                continue;
+            }
+            else if !((b'a'..=b'h').contains(&bytes[0]) && (b'a'..=b'h').contains(&bytes[1]) && (b'1'..=b'8').contains(&bytes[2]) && (b'1'..=b'8').contains(&bytes[3])) {
+                eprintln!("Invalid move skipped: {}", m);
+                continue;
+            }
+
             let from_mask = square_to_mask(&m[0..2]);
             let to_mask = square_to_mask(&m[2..4]);
             let mut captured_a_piece = false;
@@ -102,7 +112,7 @@ impl GameState {
                         b'b' => B,
                         b'r' => R,
                         b'q' => Q,
-                        _ => unreachable!()
+                        _ => { eprintln!("Invalid move skipped: {}", m); continue; }
                     };
                     self.bitboards[promoting_type] ^= to_mask;
                 }
@@ -113,7 +123,7 @@ impl GameState {
                         b'b' => b,
                         b'r' => r,
                         b'q' => q,
-                        _ => unreachable!()
+                        _ => { eprintln!("Invalid move skipped: {}", m); continue; }
                     };
                     self.bitboards[promoting_type] ^= to_mask;
                 }
@@ -231,4 +241,26 @@ pub fn index_to_algebraic(index: u8) -> String {
     let rank = (b'1' + row) as char;
 
     format!("{}{}", file, rank)
+}
+
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_square_and_index_conversions() {
+        assert_eq!(square_to_mask("a1"), 1u64);
+        assert_eq!(square_to_mask("h8"), 1u64 << 63);
+        assert_eq!(index_to_algebraic(0), "a1");
+        assert_eq!(index_to_algebraic(63), "h8");
+
+        for index in 0..64 {
+            let notation = index_to_algebraic(index);
+            let mask = square_to_mask(&notation);
+            assert_eq!(mask, 1u64 << index);
+        }
+    }
 }
