@@ -85,7 +85,7 @@ impl GameState {
                 eprintln!("Invalid move skipped: {}", m);
                 continue;
             }
-            else if !((b'a'..=b'h').contains(&bytes[0]) && (b'a'..=b'h').contains(&bytes[1]) && (b'1'..=b'8').contains(&bytes[2]) && (b'1'..=b'8').contains(&bytes[3])) {
+            else if !((b'a'..=b'h').contains(&bytes[0]) && (b'1'..=b'8').contains(&bytes[1]) && (b'a'..=b'h').contains(&bytes[2]) && (b'1'..=b'8').contains(&bytes[3])) {
                 eprintln!("Invalid move skipped: {}", m);
                 continue;
             }

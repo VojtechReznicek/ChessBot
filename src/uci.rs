@@ -1,7 +1,8 @@
 //! This module handles all the UCI (universal chess interface) communications.
 //! There are also debug functions like printing the board to the console. They launch only when --ascii argument is given
 
-use crate::board::{index_to_algebraic, GameState};
+use crate::board::{index_to_algebraic, GameState, SideToMove};
+use crate::eval::evaluate;
 use crate::movegen::{Flag, Move};
 
 
@@ -33,6 +34,14 @@ pub fn parse_uci(input: &[String], board: &mut GameState, ascii_mode: bool) {
         },
         "go" => {
             let moves = crate::movegen::generate_moves(board);
+
+            if ascii_mode {
+                println!("Position's value for the player on the move: {}", evaluate(board));
+                if board.side_to_move == SideToMove::White {
+                    println!("(it's a white move)");
+                }
+                else { println!("(it's a black move)"); }
+            }
 
             if ascii_mode {
                 print_generated_moves(&moves);
@@ -71,7 +80,7 @@ pub fn get_input() -> Vec<String> {
 
 pub fn print_generated_moves(moves: &Vec<Move>) {
     println!("--- Generated {} pseudo-legal moves ---", moves.len());
-
+    println!("(Just for the king, knights and pawns at this point)");
     for m in moves {
         let from_sq = index_to_algebraic(m.from);
         let to_sq = index_to_algebraic(m.to);

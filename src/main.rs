@@ -4,6 +4,7 @@ mod board;
 mod uci;
 mod movegen;
 mod movespreloader;
+mod eval;
 
 use crate::board::GameState;
 use crate::uci::get_input;
