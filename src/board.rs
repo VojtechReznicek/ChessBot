@@ -5,6 +5,10 @@
 //! This lets me use masks and superfast bitwise operations for moving the pieces (deleting and/or appending them on the board)
 
 #![allow(non_upper_case_globals)]
+
+use crate::board::SideToMove::{White};
+use crate::movegen::{Flag, Move};
+
 pub const P: usize = 0;
 pub const N: usize = 1;
 pub const B: usize = 2;
@@ -71,7 +75,7 @@ impl GameState {
     }
 
 
-    pub fn make_moves(&mut self, moves: &[String]) {
+    pub fn make_uci_moves(&mut self, moves: &[String]) {
         if moves.len() % 2 == 0 {
             self.side_to_move = SideToMove::White;
         }
@@ -168,10 +172,10 @@ impl GameState {
                 }
 
                 match m.as_ref() {  // Castling
-                    "e1g1" => if (self.bitboards[K] & to_mask) != 0 { self.make_simple_move("h1f1") },
-                    "e1c1" => if (self.bitboards[K] & to_mask) != 0 { self.make_simple_move("a1d1") },
-                    "e8g8" => if (self.bitboards[k] & to_mask) != 0 { self.make_simple_move("h8f8") },
-                    "e8c8" => if (self.bitboards[k] & to_mask) != 0 { self.make_simple_move("a8d8") },
+                    "e1g1" => if (self.bitboards[K] & to_mask) != 0 { self.make_simple_uci_move("h1f1") },
+                    "e1c1" => if (self.bitboards[K] & to_mask) != 0 { self.make_simple_uci_move("a1d1") },
+                    "e8g8" => if (self.bitboards[k] & to_mask) != 0 { self.make_simple_uci_move("h8f8") },
+                    "e8c8" => if (self.bitboards[k] & to_mask) != 0 { self.make_simple_uci_move("a8d8") },
                     _ => {}
                 }
                 if is_pawn_moving || captured_a_piece {
@@ -207,9 +211,8 @@ impl GameState {
         }
     }
 
-
     /// Assist function for simply moving one piece (without capturing)
-    fn make_simple_move(&mut self, m: &str) {
+    fn make_simple_uci_move(&mut self, m: &str) {
         let from_mask = square_to_mask(&m[0..2]);
         let to_mask = square_to_mask(&m[2..4]);
         let move_mask = from_mask | to_mask;
@@ -218,6 +221,151 @@ impl GameState {
                 self.bitboards[i] ^= move_mask;
                 break;
             }
+        }
+    }
+
+    fn make_move(&mut self, mov: Move) {
+        let from_mask: u64 = 1u64 << mov.from;
+        let to_mask: u64 = 1u64 << mov.to;
+        let move_mask = from_mask | to_mask;
+        let friendly_pieces_indexes: [usize; 6];
+        let enemy_pieces_indexes: [usize; 6];
+        let mut was_pawn_move = false;
+        self.en_passant_mask = 0;
+        if self.side_to_move == White {
+            friendly_pieces_indexes = [0, 1, 2, 3, 4, 5];
+            enemy_pieces_indexes = [6, 7, 8, 9, 10, 11];
+        } else {
+            friendly_pieces_indexes = [6, 7, 8, 9, 10, 11];
+            enemy_pieces_indexes = [0, 1, 2, 3, 4, 5];
+        };
+
+        if mov.flag == Flag::Normal {
+            for i in friendly_pieces_indexes {
+                if (self.bitboards[i] & from_mask) != 0 {
+                    self.bitboards[i] ^= move_mask;
+                    if i == P || i == p { was_pawn_move = true;}
+                    break;
+                }
+            }
+            self.halfmove_clock += 1;
+            if was_pawn_move {self.halfmove_clock = 0;}
+        }
+        else if mov.flag == Flag::DoublePush { // Pawns only
+            if self.side_to_move == White {
+                self.bitboards[P] ^= move_mask;
+                self.en_passant_mask = to_mask >> 8;
+            } else {
+                self.bitboards[p] ^= move_mask;
+                self.en_passant_mask = to_mask << 8;
+            }
+            self.halfmove_clock = 0;
+        }
+        else if mov.flag == Flag::Capture {
+            for i in enemy_pieces_indexes { // Capture
+                if (self.bitboards[i] & to_mask) != 0 {
+                    self.bitboards[i] ^= to_mask;
+                    break;
+                }
+            }
+            for i in friendly_pieces_indexes { // Move
+                if (self.bitboards[i] & from_mask) != 0 {
+                    self.bitboards[i] ^= move_mask;
+                    break;
+                }
+            }
+            self.halfmove_clock = 0;
+        }
+        else if mov.flag == Flag::EnPassant {
+            if self.side_to_move == White {
+                self.bitboards[P] ^= move_mask;
+                self.bitboards[p] ^= to_mask >> 8;
+            } else {
+                self.bitboards[p] ^= move_mask;
+                self.bitboards[P] ^= to_mask << 8;
+            }
+            self.halfmove_clock = 0;
+        }
+        else if mov.flag == Flag::CastleKingside {
+            if self.side_to_move == White {
+                let white_kingside_castle_mask: u64 = 0xA0;
+                self.bitboards[K] ^= move_mask;
+                self.bitboards[R] ^= white_kingside_castle_mask;
+            } else {
+                let black_kingside_castle_mask: u64 = 0xA000_0000_0000_0000;
+                self.bitboards[k] ^= move_mask;
+                self.bitboards[r] ^= black_kingside_castle_mask;
+            }
+            self.halfmove_clock += 1;
+        }
+        else if mov.flag == Flag::CastleQueenside {
+            if self.side_to_move == White {
+                let white_queenside_castle_mask: u64 = 0x09;
+                self.bitboards[K] ^= move_mask;
+                self.bitboards[R] ^= white_queenside_castle_mask;
+            } else {
+                let black_queenside_castle_mask: u64 = 0x0900_0000_0000_0000;
+                self.bitboards[k] ^= move_mask;
+                self.bitboards[r] ^= black_queenside_castle_mask;
+            }
+            self.halfmove_clock += 1;
+        }
+        else if mov.flag == Flag::PromoteBishop || mov.flag == Flag::PromoteKnight || mov.flag == Flag::PromoteRook || mov.flag == Flag::PromoteQueen
+            || mov.flag == Flag::PromoteBishopCapture || mov.flag == Flag::PromoteKnightCapture || mov.flag == Flag::PromoteRookCapture || mov.flag == Flag::PromoteQueenCapture
+        {
+            if self.side_to_move == White {
+                if mov.flag == Flag::PromoteBishopCapture || mov.flag == Flag::PromoteKnightCapture || mov.flag == Flag::PromoteRookCapture || mov.flag == Flag::PromoteQueenCapture {
+                    for i in enemy_pieces_indexes {
+                        if (self.bitboards[i] & to_mask) != 0 {
+                            self.bitboards[i] ^= to_mask;
+                            break;
+                        }
+                    }
+                }
+                self.bitboards[P] ^= from_mask;
+                let i = match mov.flag {
+                    Flag::PromoteBishop => B,
+                    Flag::PromoteBishopCapture => B,
+                    Flag::PromoteKnight => N,
+                    Flag::PromoteKnightCapture => N,
+                    Flag::PromoteRook => R,
+                    Flag::PromoteRookCapture => R,
+                    Flag::PromoteQueen => Q,
+                    Flag::PromoteQueenCapture => Q,
+                    _ => unreachable!(),
+                };
+                self.bitboards[i] ^= to_mask;
+            }
+            else {
+                if mov.flag == Flag::PromoteBishopCapture || mov.flag == Flag::PromoteKnightCapture || mov.flag == Flag::PromoteRookCapture || mov.flag == Flag::PromoteQueenCapture {
+                    for i in enemy_pieces_indexes {
+                        if (self.bitboards[i] & to_mask) != 0 {
+                            self.bitboards[i] ^= to_mask;
+                            break;
+                        }
+                    }
+                }
+                self.bitboards[p] ^= from_mask;
+                let i = match mov.flag {
+                    Flag::PromoteBishop => b,
+                    Flag::PromoteBishopCapture => b,
+                    Flag::PromoteKnight => n,
+                    Flag::PromoteKnightCapture => n,
+                    Flag::PromoteRook => r,
+                    Flag::PromoteRookCapture => r,
+                    Flag::PromoteQueen => q,
+                    Flag::PromoteQueenCapture => q,
+                    _ => unreachable!(),
+                };
+                self.bitboards[i] ^= to_mask;
+            }
+            self.halfmove_clock = 0;
+        }
+        if self.side_to_move ==White {
+            self.side_to_move = SideToMove::Black;
+        }
+        else {
+            self.side_to_move =White;
         }
     }
 }

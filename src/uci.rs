@@ -23,7 +23,7 @@ pub fn parse_uci(input: &[String], board: &mut GameState, ascii_mode: bool) {
 
                 if input.len() > 3 && input[2] == "moves" {
 
-                    board.make_moves(&input[3..]);
+                    board.make_uci_moves(&input[3..]);
                 }
 
                 if ascii_mode {
@@ -38,9 +38,9 @@ pub fn parse_uci(input: &[String], board: &mut GameState, ascii_mode: bool) {
             if ascii_mode {
                 println!("Position's value for the player on the move: {}", evaluate(board));
                 if board.side_to_move == SideToMove::White {
-                    println!("(it's a white move)");
+                    println!("(it's a white move)\n");
                 }
-                else { println!("(it's a black move)"); }
+                else { println!("(it's a black move)\n"); }
             }
 
             if ascii_mode {
@@ -80,14 +80,15 @@ pub fn get_input() -> Vec<String> {
 
 pub fn print_generated_moves(moves: &Vec<Move>) {
     println!("--- Generated {} pseudo-legal moves ---", moves.len());
-    println!("(Just for the king, knights and pawns at this point)");
+    println!("(Just for the king, knights and pawns at this point)\n");
     for m in moves {
         let from_sq = index_to_algebraic(m.from);
         let to_sq = index_to_algebraic(m.to);
 
         let flag_suffix = match m.flag {
             Flag::Normal => "",
-            Flag::Castle => " [Castle]",
+            Flag::CastleKingside => " [CastleKingside]",
+            Flag::CastleQueenside => " [CastleQueenside]",
             Flag::DoublePush => " [DoublePush]",
             Flag::Capture => " [Capture]",
             Flag::PromoteQueen => " [PromoteQueen]",

@@ -17,6 +17,7 @@ pub struct Move{
 }
 
 #[repr(u8)]
+#[derive(PartialEq, Eq, Copy, Clone)]
 pub enum Flag {
     Normal,
     PromoteQueen,
@@ -27,7 +28,8 @@ pub enum Flag {
     PromoteRookCapture,
     PromoteBishopCapture,
     PromoteKnightCapture,
-    Castle,
+    CastleQueenside,
+    CastleKingside,
     DoublePush,
     Capture,
     EnPassant,
@@ -146,7 +148,7 @@ fn generate_king_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
                         king_moves.push(Move{
                             from: 4,
                             to: 6,
-                            flag: Flag::Castle
+                            flag: Flag::CastleKingside
                         })
                     }
                 }
@@ -155,7 +157,7 @@ fn generate_king_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
                         king_moves.push(Move{
                             from: 4,
                             to: 2,
-                            flag: Flag::Castle
+                            flag: Flag::CastleQueenside
                         })
                     }
                 }
@@ -196,7 +198,7 @@ fn generate_king_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
                         king_moves.push(Move{
                             from: 60,
                             to: 62,
-                            flag: Flag::Castle
+                            flag: Flag::CastleQueenside
                         })
                     }
                 }
@@ -205,7 +207,7 @@ fn generate_king_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
                         king_moves.push(Move{
                             from: 60,
                             to: 58,
-                            flag: Flag::Castle
+                            flag: Flag::CastleKingside
                         })
                     }
                 }

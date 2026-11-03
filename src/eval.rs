@@ -63,8 +63,8 @@ fn pawns_covering_bonus(board: &GameState) -> i32 {
 /// Bonuses all pieces in opponent's side by 5 points
 fn aggression_bonus(white_pieces: u64, black_pieces: u64) -> i32 {
     let mut value: i32 = 0;
-    let white_half:u64 = 0x0000_0000_FFFF_FFFF;
-    let black_half:u64 = 0xFFFF_FFFF_0000_0000;
+    let white_half: u64 = 0x0000_0000_FFFF_FFFF;
+    let black_half: u64 = 0xFFFF_FFFF_0000_0000;
     value += (white_pieces & black_half).count_ones() as i32 * 5;
     value -= (black_pieces & white_half).count_ones() as i32 * 5;
     value
