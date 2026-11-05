@@ -18,19 +18,18 @@ pub fn parse_uci(input: &[String], board: &mut GameState, ascii_mode: bool) {
         },
         "isready" => println!("readyok"),
         "position" => {
-            if input.len() > 1 && input[1] == "startpos" {
-                *board = GameState::new();
-
-                if input.len() > 3 && input[2] == "moves" {
-
-                    board.make_uci_moves(&input[3..]);
-                }
-
-                if ascii_mode {
-                    print_board(board);
+            *board = GameState::new();
+            for (i, txt) in input.iter().enumerate() {
+                if txt == "moves" {
+                    board.make_uci_moves(&input[i + 1..]);
+                    if ascii_mode {
+                        print_board(board);
+                    }
+                    break;
                 }
 
             }
+
         },
         "go" => {
             let moves = crate::movegen::generate_moves(board);

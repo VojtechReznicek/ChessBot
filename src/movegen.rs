@@ -55,7 +55,7 @@ fn generate_knight_moves(board: &GameState, white_pieces: u64, black_pieces: u64
         while white_knights != 0 {
             let knight_square = white_knights.trailing_zeros() as u8;
             let mut legal_moves_mask = KNIGHT_ATTACKS[knight_square as usize] & !white_pieces;
-            let legal_captures_mask = legal_moves_mask & black_pieces;
+            let mut legal_captures_mask = legal_moves_mask & black_pieces;
             legal_moves_mask &= !black_pieces;
             while legal_moves_mask != 0 {  // Without capture
                 let to_index = legal_moves_mask.trailing_zeros() as u8;
@@ -73,7 +73,7 @@ fn generate_knight_moves(board: &GameState, white_pieces: u64, black_pieces: u64
                     to: to_index,
                     flag: Flag::Capture
                 });
-                legal_moves_mask &= legal_moves_mask - 1;
+                legal_captures_mask &= legal_captures_mask - 1;
             }
 
             white_knights &= white_knights - 1;
@@ -84,7 +84,7 @@ fn generate_knight_moves(board: &GameState, white_pieces: u64, black_pieces: u64
         while black_knights != 0 {
             let knight_square = black_knights.trailing_zeros() as u8;
             let mut legal_moves_mask = KNIGHT_ATTACKS[knight_square as usize] & !black_pieces;
-            let legal_captures_mask = legal_moves_mask & white_pieces;
+            let mut legal_captures_mask = legal_moves_mask & white_pieces;
             legal_moves_mask &= !white_pieces;
             while legal_moves_mask != 0 {
                 let to_index = legal_moves_mask.trailing_zeros() as u8;
@@ -102,7 +102,7 @@ fn generate_knight_moves(board: &GameState, white_pieces: u64, black_pieces: u64
                     to: to_index,
                     flag: Flag::Capture
                 });
-                legal_moves_mask &= legal_moves_mask - 1;
+                legal_captures_mask &= legal_captures_mask - 1;
             }
 
             black_knights &= black_knights - 1;
@@ -121,7 +121,7 @@ fn generate_king_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
         while white_kings != 0 {
             let king_square = white_kings.trailing_zeros() as u8;
             let mut legal_moves_mask = KING_ATTACKS[king_square as usize] & !white_pieces;  // This ignores getting the king into a check
-            let legal_captures_mask = legal_moves_mask & black_pieces;
+            let mut legal_captures_mask = legal_moves_mask & black_pieces;
             legal_moves_mask &= !black_pieces;
             while legal_moves_mask != 0 {
                 let to_index = legal_moves_mask.trailing_zeros() as u8;
@@ -139,7 +139,7 @@ fn generate_king_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
                     to: to_index,
                     flag: Flag::Capture
                 });
-                legal_moves_mask &= legal_moves_mask - 1;
+                legal_captures_mask &= legal_captures_mask - 1;
             }
 
             if king_square == 4 { // Castle
@@ -171,7 +171,7 @@ fn generate_king_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
         while black_kings != 0 {
             let king_square = black_kings.trailing_zeros() as u8;
             let mut legal_moves_mask = KING_ATTACKS[king_square as usize] & !black_pieces;
-            let legal_captures_mask = legal_moves_mask & white_pieces;
+            let mut legal_captures_mask = legal_moves_mask & white_pieces;
             legal_moves_mask &= !white_pieces;
             while legal_moves_mask != 0 { // Normal king move
                 let to_index = legal_moves_mask.trailing_zeros() as u8;
@@ -189,7 +189,7 @@ fn generate_king_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
                     to: to_index,
                     flag: Flag::Capture
                 });
-                legal_moves_mask &= legal_moves_mask - 1;
+                legal_captures_mask &= legal_captures_mask - 1;
             }
 
             if king_square == 60 { // Castle
