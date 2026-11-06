@@ -6,7 +6,7 @@
 
 #![allow(non_upper_case_globals)]
 
-use crate::board::SideToMove::{White};
+use crate::board::SideToMove::{Black, White};
 use crate::movegen::{Flag, Move};
 
 pub const P: usize = 0;
@@ -26,6 +26,7 @@ pub const k: usize = 11;
 pub struct GameState {
     /// The current board position
     pub bitboards: [u64; 12],
+    /// The square where to go to take En Passant (NOT where the pawn actually is)
     pub en_passant_mask: u64,
     pub side_to_move: SideToMove,
     pub castling_rights: CastlingRights,
@@ -36,12 +37,19 @@ pub enum SideToMove {
     Black,
     White,
 }
-#[derive()]
+#[derive(Clone, Copy, Debug)]
 pub struct CastlingRights {
     pub white_kingside: bool,
     pub white_queenside: bool,
     pub black_kingside: bool,
     pub black_queenside: bool,
+}
+#[derive(Clone, Copy, Debug)]
+pub struct Undo {
+    pub captured_piece: Option<usize>,
+    pub castling_rights: CastlingRights,
+    pub en_passant_mask: u64,
+    pub halfmove_clock: u8,
 }
 
 impl GameState {
@@ -156,7 +164,7 @@ impl GameState {
                     self.bitboards[P] &= !en_passant_capture_mask;
                 }
 
-                for i in 0..12 { // The move
+                for i in 0..12 { // The moNotve
                     if (self.bitboards[i] & from_mask) != 0 {
                         self.bitboards[i] ^= move_mask;
                         if (i == P || i == p) && from_mask.trailing_zeros().abs_diff(to_mask.trailing_zeros()) == 16 {
@@ -224,13 +232,21 @@ impl GameState {
         }
     }
 
-    fn make_move(&mut self, mov: Move) {
+    fn make_move(&mut self, mov: Move) -> Undo {
         let from_mask: u64 = 1u64 << mov.from;
         let to_mask: u64 = 1u64 << mov.to;
         let move_mask = from_mask | to_mask;
         let friendly_pieces_indexes: [usize; 6];
         let enemy_pieces_indexes: [usize; 6];
         let mut was_pawn_move = false;
+
+        // For unmake:
+        let old_castling_rights = self.castling_rights;
+        let old_en_passant_mask = self.en_passant_mask;
+        let old_halfmove_clock = self.halfmove_clock;
+        let mut captured_piece = None;
+        //
+
         self.en_passant_mask = 0;
         if self.side_to_move == White {
             friendly_pieces_indexes = [0, 1, 2, 3, 4, 5];
@@ -265,6 +281,7 @@ impl GameState {
             for i in enemy_pieces_indexes { // Capture
                 if (self.bitboards[i] & to_mask) != 0 {
                     self.bitboards[i] ^= to_mask;
+                    captured_piece = Some(i);
                     break;
                 }
             }
@@ -291,10 +308,12 @@ impl GameState {
                 let white_kingside_castle_mask: u64 = 0xA0;
                 self.bitboards[K] ^= move_mask;
                 self.bitboards[R] ^= white_kingside_castle_mask;
+                self.castling_rights.white_kingside = false;
             } else {
                 let black_kingside_castle_mask: u64 = 0xA000_0000_0000_0000;
                 self.bitboards[k] ^= move_mask;
                 self.bitboards[r] ^= black_kingside_castle_mask;
+                self.castling_rights.black_kingside = false;
             }
             self.halfmove_clock += 1;
         }
@@ -303,10 +322,12 @@ impl GameState {
                 let white_queenside_castle_mask: u64 = 0x09;
                 self.bitboards[K] ^= move_mask;
                 self.bitboards[R] ^= white_queenside_castle_mask;
+                self.castling_rights.white_queenside = false;
             } else {
                 let black_queenside_castle_mask: u64 = 0x0900_0000_0000_0000;
                 self.bitboards[k] ^= move_mask;
                 self.bitboards[r] ^= black_queenside_castle_mask;
+                self.castling_rights.black_queenside = false;
             }
             self.halfmove_clock += 1;
         }
@@ -318,6 +339,7 @@ impl GameState {
                     for i in enemy_pieces_indexes {
                         if (self.bitboards[i] & to_mask) != 0 {
                             self.bitboards[i] ^= to_mask;
+                            captured_piece = Some(i);
                             break;
                         }
                     }
@@ -338,9 +360,10 @@ impl GameState {
             }
             else {
                 if mov.flag == Flag::PromoteBishopCapture || mov.flag == Flag::PromoteKnightCapture || mov.flag == Flag::PromoteRookCapture || mov.flag == Flag::PromoteQueenCapture {
-                    for i in enemy_pieces_indexes {
+                    for i in enemy_pieces_indexes { // Capture
                         if (self.bitboards[i] & to_mask) != 0 {
                             self.bitboards[i] ^= to_mask;
+                            captured_piece = Some(i);
                             break;
                         }
                     }
@@ -361,14 +384,144 @@ impl GameState {
             }
             self.halfmove_clock = 0;
         }
-        if self.side_to_move ==White {
+        if self.side_to_move == White {
             self.side_to_move = SideToMove::Black;
         }
         else {
-            self.side_to_move =White;
+            self.side_to_move = White;
+        }
+        Undo{
+            captured_piece,
+            castling_rights: old_castling_rights,
+            en_passant_mask: old_en_passant_mask,
+            halfmove_clock: old_halfmove_clock,
+        }
+    }
+    fn unmake_move(&mut self, mov: Move, undo: Undo) {
+        if self.side_to_move == White {
+            self.side_to_move = Black;
+        }
+        else {
+            self.side_to_move = White;
+        }
+        self.castling_rights = undo.castling_rights;
+        self.en_passant_mask = undo.en_passant_mask;
+        self.halfmove_clock = undo.halfmove_clock;
+        let from_mask = 1u64 << mov.from;
+        let to_mask = 1u64 << mov.to;
+        let move_mask = from_mask | to_mask;
+        let friendly_pieces_indexes: [usize; 6];
+        let enemy_pieces_indexes: [usize; 6];
+
+        match mov.from { // King or rook moved
+            4 => { self.castling_rights.white_kingside = false; self.castling_rights.white_queenside = false; } // E1
+            60 => { self.castling_rights.black_kingside = false; self.castling_rights.black_queenside = false; } // E8
+            0 => self.castling_rights.white_queenside = false, // A1
+            7 => self.castling_rights.white_kingside = false,  // H1
+            56 => self.castling_rights.black_queenside = false, // A8
+            63 => self.castling_rights.black_kingside = false,  // H8
+            _ => {}
+        }
+        match mov.to { // Rook captured
+            0 => self.castling_rights.white_queenside = false,
+            7 => self.castling_rights.white_kingside = false,
+            56 => self.castling_rights.black_queenside = false,
+            63 => self.castling_rights.black_kingside = false,
+            _ => {}
+        }
+
+        if self.side_to_move == White {
+            friendly_pieces_indexes = [0, 1, 2, 3, 4, 5];
+            enemy_pieces_indexes = [6, 7, 8, 9, 10, 11];
+        } else {
+            friendly_pieces_indexes = [6, 7, 8, 9, 10, 11];
+            enemy_pieces_indexes = [0, 1, 2, 3, 4, 5];
+        };
+
+        if mov.flag == Flag::Normal {
+            for i in friendly_pieces_indexes {
+                if (self.bitboards[i] & to_mask) != 0 {
+                    self.bitboards[i] ^= move_mask;
+                    break;
+                }
+            }
+        }
+        else if mov.flag == Flag::DoublePush { // Pawns only
+            if self.side_to_move == White {
+                self.bitboards[P] ^= move_mask;
+            } else {
+                self.bitboards[p] ^= move_mask;
+            }
+        }
+        else if mov.flag == Flag::Capture {
+            let captured = undo.captured_piece;
+
+            for i in friendly_pieces_indexes { // Move
+                if (self.bitboards[i] & to_mask) != 0 {
+                    self.bitboards[i] ^= move_mask;
+                    break;
+                }
+            }
+            self.bitboards[captured.unwrap()] ^= to_mask;
+        }
+        else if mov.flag == Flag::EnPassant {
+            for i in friendly_pieces_indexes {
+                if (self.bitboards[i] & to_mask) != 0 {
+                    self.bitboards[i] ^= move_mask;
+                }
+            }
+            if self.side_to_move == White {
+                self.bitboards[p] ^= to_mask >> 8;
+            }
+            else {
+                self.bitboards[P] ^= to_mask << 8;
+            }
+        }
+        else if mov.flag == Flag::CastleKingside {
+            if self.side_to_move == White {
+                let white_kingside_castle_mask: u64 = 0xA0;
+                self.bitboards[K] ^= move_mask;
+                self.bitboards[R] ^= white_kingside_castle_mask;
+            } else {
+                let black_kingside_castle_mask: u64 = 0xA000_0000_0000_0000;
+                self.bitboards[k] ^= move_mask;
+                self.bitboards[r] ^= black_kingside_castle_mask;
+            }
+        }
+        else if mov.flag == Flag::CastleQueenside {
+            if self.side_to_move == White {
+                let white_queenside_castle_mask: u64 = 0x09;
+                self.bitboards[K] ^= move_mask;
+                self.bitboards[R] ^= white_queenside_castle_mask;
+            } else {
+                let black_queenside_castle_mask: u64 = 0x0900_0000_0000_0000;
+                self.bitboards[k] ^= move_mask;
+                self.bitboards[r] ^= black_queenside_castle_mask;
+            }
+        }
+        else if mov.flag == Flag::PromoteBishop || mov.flag == Flag::PromoteKnight || mov.flag == Flag::PromoteRook || mov.flag == Flag::PromoteQueen
+        || mov.flag == Flag::PromoteBishopCapture || mov.flag == Flag::PromoteKnightCapture || mov.flag == Flag::PromoteRookCapture || mov.flag == Flag::PromoteQueenCapture {
+            if self.side_to_move == White {
+                self.bitboards[P] ^= from_mask;
+            } else {
+                self.bitboards[p] ^= from_mask;
+            }
+
+            for i in friendly_pieces_indexes {
+                if (self.bitboards[i] & to_mask) != 0 {
+                    self.bitboards[i] ^= to_mask;
+                    break;
+                }
+            }
+            if mov.flag == Flag::PromoteBishopCapture || mov.flag == Flag::PromoteKnightCapture || mov.flag == Flag::PromoteRookCapture || mov.flag == Flag::PromoteQueenCapture {
+                let captured = undo.captured_piece;
+                self.bitboards[captured.unwrap()] ^= to_mask;
+            }
         }
     }
 }
+
+
 
 /// Makes a bitboard with a single bit from given coordinates
 pub fn square_to_mask(square: &str) -> u64 {
