@@ -4,7 +4,7 @@
 use crate::board::{index_to_algebraic, GameState, SideToMove};
 use crate::eval::evaluate;
 use crate::movegen::{Flag, Move};
-
+use crate::search::root_negamax;
 
 pub fn parse_uci(input: &[String], board: &mut GameState, ascii_mode: bool) {
     if input.is_empty() {
@@ -32,25 +32,25 @@ pub fn parse_uci(input: &[String], board: &mut GameState, ascii_mode: bool) {
 
         },
         "go" => {
-            let moves = crate::movegen::generate_moves(board);
+
 
             if ascii_mode {
+                let moves = crate::movegen::generate_moves(board);
                 println!("Position's value for the player on the move: {}", evaluate(board));
                 if board.side_to_move == SideToMove::White {
                     println!("(it's a white move)\n");
                 }
                 else { println!("(it's a black move)\n"); }
-            }
 
-            if ascii_mode {
                 print_generated_moves(&moves);
             }
 
-            if let Some(first_move) = moves.first() {
-                let from_sq = index_to_algebraic(first_move.from);
-                let to_sq = index_to_algebraic(first_move.to);
 
-                let flag_char = match first_move.flag {
+            if let Some(best_move) = root_negamax(board, 5) {
+                let from_sq = index_to_algebraic(best_move.from);
+                let to_sq = index_to_algebraic(best_move.to);
+
+                let flag_char = match best_move.flag {
                     crate::movegen::Flag::PromoteQueen | crate::movegen::Flag::PromoteQueenCapture => "q",
                     crate::movegen::Flag::PromoteRook | crate::movegen::Flag::PromoteRookCapture => "r",
                     crate::movegen::Flag::PromoteBishop | crate::movegen::Flag::PromoteBishopCapture => "b",

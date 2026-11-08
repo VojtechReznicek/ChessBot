@@ -1,7 +1,7 @@
 //! This module manages all the information about the current game state (chess board and some data for specific chess rules like castling, en passant etc.)
-//! and also the functions for making changes on this structure
-//! The chess board is represented as 12 bitboards each for one of the 6 types of pieces for both black and white
-//! Bitboard is an u64 number where each bit is one square on the board and 1 means the square is occupied by the specific piece, otherwise it's empty
+//! and also the functions for making changes on this structure.
+//! The chess board is represented as 12 bitboards each for one of the 6 types of pieces for both black and white.
+//! Bitboard is an u64 number where each bit is one square on the board and 1 means the square is occupied by the specific piece, otherwise it's empty.
 //! This lets me use masks and superfast bitwise operations for moving the pieces (deleting and/or appending them on the board)
 
 #![allow(non_upper_case_globals)]
@@ -232,7 +232,7 @@ impl GameState {
         }
     }
 
-    fn make_move(&mut self, mov: Move) -> Undo {
+    pub fn make_move(&mut self, mov: Move) -> Undo {
         let from_mask: u64 = 1u64 << mov.from;
         let to_mask: u64 = 1u64 << mov.to;
         let move_mask = from_mask | to_mask;
@@ -397,7 +397,7 @@ impl GameState {
             halfmove_clock: old_halfmove_clock,
         }
     }
-    fn unmake_move(&mut self, mov: Move, undo: Undo) {
+    pub fn unmake_move(&mut self, mov: Move, undo: Undo) {
         if self.side_to_move == White {
             self.side_to_move = Black;
         }

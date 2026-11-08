@@ -10,6 +10,7 @@ pub const RANK_7: u64 = 0x00FF000000000000;
 pub const FILE_A: u64 = 0x0101010101010101;
 pub const FILE_H: u64 = 0x8080808080808080;
 
+#[derive(Clone, Copy)]
 pub struct Move{
     pub(crate) from: u8,
     pub(crate) to: u8,
