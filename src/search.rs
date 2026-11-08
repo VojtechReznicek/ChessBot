@@ -1,3 +1,8 @@
+//! This module implements the Negamax search algorithm.
+//! Negamax is used instead of standard Minimax because they are mathematically equivalent in zero-sum games,
+//! but Negamax simplifies the implementation into a single maximizing loop.
+//! Returning values are simply negated between plies (what is great for White is equally terrible for Black).
+
 use crate::board::GameState;
 use crate::eval::evaluate;
 use crate::movegen::{generate_moves, Move};

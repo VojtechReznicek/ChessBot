@@ -22,6 +22,7 @@ pub const r: usize = 9;
 pub const q: usize = 10;
 pub const k: usize = 11;
 
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 /// The main structure containing all important information about the current game state
 pub struct GameState {
     /// The current board position
@@ -32,12 +33,12 @@ pub struct GameState {
     pub castling_rights: CastlingRights,
     pub halfmove_clock: u8,
 }
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SideToMove {
     Black,
     White,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct CastlingRights {
     pub white_kingside: bool,
     pub white_queenside: bool,
@@ -411,7 +412,6 @@ impl GameState {
         let to_mask = 1u64 << mov.to;
         let move_mask = from_mask | to_mask;
         let friendly_pieces_indexes: [usize; 6];
-        let enemy_pieces_indexes: [usize; 6];
 
         match mov.from { // King or rook moved
             4 => { self.castling_rights.white_kingside = false; self.castling_rights.white_queenside = false; } // E1
@@ -432,10 +432,8 @@ impl GameState {
 
         if self.side_to_move == White {
             friendly_pieces_indexes = [0, 1, 2, 3, 4, 5];
-            enemy_pieces_indexes = [6, 7, 8, 9, 10, 11];
         } else {
             friendly_pieces_indexes = [6, 7, 8, 9, 10, 11];
-            enemy_pieces_indexes = [0, 1, 2, 3, 4, 5];
         };
 
         if mov.flag == Flag::Normal {
@@ -563,5 +561,46 @@ mod tests {
             let mask = square_to_mask(&notation);
             assert_eq!(mask, 1u64 << index);
         }
+    }
+
+    #[test]
+    fn test_make_and_unmake_move() {
+        let moves: Vec<Move> = vec![
+        Move{
+            from: 12,
+            to: 28,
+            flag: Flag::DoublePush
+        },
+        Move{
+            from: 11,
+            to: 27,
+            flag: Flag::DoublePush
+        },
+        Move{
+            from: 1,
+            to: 18,
+            flag: Flag::Normal
+        },
+        Move{
+            from: 6,
+            to: 21,
+            flag: Flag::Normal
+        },
+        Move{
+            from: 6,
+            to: 23,
+            flag: Flag::Normal
+        },
+        ];
+
+
+        let board2 = GameState::new();
+        for mov in moves {
+            let mut board1 = GameState::new();
+            let undo =board1.make_move(mov);
+            board1.unmake_move(mov, undo);
+            assert_eq!(board1, board2);
+        }
+
     }
 }
