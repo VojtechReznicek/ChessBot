@@ -385,6 +385,24 @@ impl GameState {
             }
             self.halfmove_clock = 0;
         }
+
+        match mov.from {
+            4 => { self.castling_rights.white_kingside = false; self.castling_rights.white_queenside = false; }
+            60 => { self.castling_rights.black_kingside = false; self.castling_rights.black_queenside = false; }
+            0 => self.castling_rights.white_queenside = false,
+            7 => self.castling_rights.white_kingside = false,
+            56 => self.castling_rights.black_queenside = false,
+            63 => self.castling_rights.black_kingside = false,
+            _ => {}
+        }
+        match mov.to {
+            0 => self.castling_rights.white_queenside = false,
+            7 => self.castling_rights.white_kingside = false,
+            56 => self.castling_rights.black_queenside = false,
+            63 => self.castling_rights.black_kingside = false,
+            _ => {}
+        }
+
         if self.side_to_move == White {
             self.side_to_move = SideToMove::Black;
         }
@@ -413,22 +431,7 @@ impl GameState {
         let move_mask = from_mask | to_mask;
         let friendly_pieces_indexes: [usize; 6];
 
-        match mov.from { // King or rook moved
-            4 => { self.castling_rights.white_kingside = false; self.castling_rights.white_queenside = false; } // E1
-            60 => { self.castling_rights.black_kingside = false; self.castling_rights.black_queenside = false; } // E8
-            0 => self.castling_rights.white_queenside = false, // A1
-            7 => self.castling_rights.white_kingside = false,  // H1
-            56 => self.castling_rights.black_queenside = false, // A8
-            63 => self.castling_rights.black_kingside = false,  // H8
-            _ => {}
-        }
-        match mov.to { // Rook captured
-            0 => self.castling_rights.white_queenside = false,
-            7 => self.castling_rights.white_kingside = false,
-            56 => self.castling_rights.black_queenside = false,
-            63 => self.castling_rights.black_kingside = false,
-            _ => {}
-        }
+
 
         if self.side_to_move == White {
             friendly_pieces_indexes = [0, 1, 2, 3, 4, 5];
@@ -602,5 +605,35 @@ mod tests {
             assert_eq!(board1, board2);
         }
 
+    }
+    #[test]
+    fn black_kingside_castle_moves_h8_rook_to_f8() {
+        let mut g = GameState::new();
+        g.bitboards[b] &= !(1u64 << 61); // clear f8
+        g.bitboards[n] &= !(1u64 << 62); // clear g8
+        g.side_to_move = SideToMove::Black;
+
+        let castle = crate::movegen::generate_moves(&g)
+            .into_iter()
+            .find(|m| m.from == 60 && m.to == 62)
+            .expect("castling to g8 should be generated");
+        g.make_move(castle);
+
+        assert_ne!(g.bitboards[r] & (1u64 << 61), 0, "rook should be on f8");
+        assert_ne!(g.bitboards[r] & (1u64 << 56), 0, "a8 rook should not move");
+    }
+
+    #[test]
+    fn king_move_make_unmake_restores_castling_rights() {
+        let mut g = GameState::new();
+        g.bitboards[P] &= !(1u64 << 12); // clear e2 so e1e2 is possible
+        let before = g;
+
+        let mov = Move { from: 4, to: 12, flag: Flag::Normal };
+        let undo = g.make_move(mov);
+        assert!(!g.castling_rights.white_kingside, "king moved, rights should be gone");
+
+        g.unmake_move(mov, undo);
+        assert_eq!(g, before, "unmake must restore the exact previous state");
     }
 }

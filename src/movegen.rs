@@ -199,7 +199,7 @@ fn generate_king_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
                         king_moves.push(Move{
                             from: 60,
                             to: 62,
-                            flag: Flag::CastleQueenside
+                            flag: Flag::CastleKingside
                         })
                     }
                 }
