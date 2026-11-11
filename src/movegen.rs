@@ -9,6 +9,8 @@ pub const RANK_2: u64 = 0x000000000000FF00;
 pub const RANK_7: u64 = 0x00FF000000000000;
 pub const FILE_A: u64 = 0x0101010101010101;
 pub const FILE_H: u64 = 0x8080808080808080;
+pub const RANK_1: u64 = 0x00000000000000FF;
+pub const RANK_8: u64 = 0xFF00000000000000;
 
 #[derive(Clone, Copy)]
 pub struct Move{

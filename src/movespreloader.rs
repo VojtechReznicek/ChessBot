@@ -8,6 +8,32 @@ pub const KNIGHT_ATTACKS: [u64; 64] = init_knight_attacks();
 
 /// Preloaded table of all the possible king attacks
 pub const KING_ATTACKS: [u64; 64] = init_king_attacks();
+
+/// Preloaded table of all the possible north ray attacks
+pub const NORTH_ATTACKS: [u64; 64] = init_sliding_attacks(1, 0);
+
+/// Preloaded table of all the possible south ray attacks
+pub const SOUTH_ATTACKS: [u64; 64] = init_sliding_attacks(-1, 0);
+
+/// Preloaded table of all the possible west ray attacks
+pub const WEST_ATTACKS: [u64; 64] = init_sliding_attacks(0, -1);
+
+/// Preloaded table of all the possible east ray attacks
+pub const EAST_ATTACKS: [u64; 64] = init_sliding_attacks(0, 1);
+
+/// Preloaded table of all the possible north-west ray attacks
+pub const NORTH_WEST_ATTACKS: [u64; 64] = init_sliding_attacks(1, -1);
+
+/// Preloaded table of all the possible north-east ray attacks
+pub const NORTH_EAST_ATTACKS: [u64; 64] = init_sliding_attacks(1, 1);
+
+/// Preloaded table of all the possible south-west ray attacks
+pub const SOUTH_WEST_ATTACKS: [u64; 64] = init_sliding_attacks(-1, -1);
+
+/// Preloaded table of all the possible south-east ray attacks
+pub const SOUTH_EAST_ATTACKS: [u64; 64] = init_sliding_attacks(-1, 1);
+
+
 const fn init_knight_attacks() -> [u64; 64] {
     let mut table: [u64; 64] = [0; 64];
     let mut i: usize = 0;
@@ -141,12 +167,30 @@ const fn init_king_attacks() -> [u64; 64] {
 // +- 8 +- 1 (diagonals)
 
 
+const fn init_sliding_attacks(row_step: i8, col_step: i8) ->  [u64; 64] {
+    let mut table: [u64; 64] = [0; 64];
+    let mut i: usize = 0;
+    while i < 64 {
+        let mut attacks: u64 = 0;
+        let mut row = (i / 8) as i8 + row_step;
+        let mut col = (i % 8) as i8 + col_step;
+        while row >= 0 && row < 8 && col >= 0 && col < 8 {
+            attacks |= 1u64 << (row * 8 + col);
+            row += row_step;
+            col += col_step;
+        }
+        table[i] = attacks;
+        i += 1;
+    }
+    table
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_moves_symetry() {
+    fn test_leaping_moves_symetry() {
         for i in 0..64 {
             let mut moves = KNIGHT_ATTACKS[i];
             while moves != 0 {
@@ -157,7 +201,41 @@ mod tests {
                 moves &= moves - 1;
             }
         }
+
+        for i in 0..64 {
+            let mut moves = KING_ATTACKS[i];
+            while moves != 0 {
+                let j = moves.trailing_zeros() as usize;
+                let back = KING_ATTACKS[j];
+                let res = back & (1u64 << i) != 0;
+                assert_eq!(res, true);
+                moves &= moves - 1;
+            }
+        }
+
     }
 
+    #[test]
+    fn test_sliding_moves_symmetry() {
+        let opposite_pairs = [
+            (NORTH_ATTACKS, SOUTH_ATTACKS),
+            (EAST_ATTACKS, WEST_ATTACKS),
+            (NORTH_WEST_ATTACKS, SOUTH_EAST_ATTACKS),
+            (NORTH_EAST_ATTACKS, SOUTH_WEST_ATTACKS),
+        ];
+
+        for (forward, backward) in opposite_pairs {
+            for i in 0..64 {
+                let mut moves = forward[i];
+                while moves != 0 {
+                    let j = moves.trailing_zeros() as usize;
+                    let back = backward[j];
+                    let res = (back & (1u64 << i)) != 0;
+                    assert!(res, "Ray mismatch between square {} and {}", i, j);
+                    moves &= moves - 1;
+                }
+            }
+        }
+    }
 
 }
