@@ -4,13 +4,11 @@
 //! Move is a simplified structure for saving moves as indexes (not bitboards) and a flag (that contains data about moves that require any special handling)
 
 use crate::board::{GameState, B, N, P, R, Q, K, p, n, b, r, q, k, SideToMove,};
-use crate::movespreloader::{KNIGHT_ATTACKS, KING_ATTACKS};
+use crate::movespreloader::{KNIGHT_ATTACKS, KING_ATTACKS, NORTH_ATTACKS, SOUTH_ATTACKS, EAST_ATTACKS, WEST_ATTACKS};
 pub const RANK_2: u64 = 0x000000000000FF00;
 pub const RANK_7: u64 = 0x00FF000000000000;
 pub const FILE_A: u64 = 0x0101010101010101;
 pub const FILE_H: u64 = 0x8080808080808080;
-pub const RANK_1: u64 = 0x00000000000000FF;
-pub const RANK_8: u64 = 0xFF00000000000000;
 
 #[derive(Clone, Copy)]
 pub struct Move{
@@ -46,6 +44,7 @@ pub fn generate_moves(board: &GameState) -> Vec<Move> {
     moves.append(&mut generate_knight_moves(board, white_pieces, black_pieces));
     moves.append(&mut generate_king_moves(board, white_pieces, black_pieces, occupancy));
     moves.append(&mut generate_pawn_moves(board, black_pieces, white_pieces, occupancy));
+    moves.append(&mut generate_rook_moves(board, white_pieces, black_pieces, occupancy));
     moves
 }
 
@@ -405,6 +404,128 @@ fn generate_pawn_moves(board: &GameState, black_pieces: u64, white_pieces: u64, 
     }
 
     pawn_moves
+}
+
+
+fn generate_rook_moves(board: &GameState, white_pieces: u64, black_pieces: u64, occupancy: u64) -> Vec<Move> {
+    let mut rook_moves = Vec::new();
+    if board.side_to_move == SideToMove::White {
+        let mut white_rooks = board.bitboards[R] | board.bitboards[Q];
+        while white_rooks != 0 {
+            let rook_index = white_rooks.trailing_zeros() as u8;
+            let north_obstacle = (NORTH_ATTACKS[rook_index as usize] & occupancy).trailing_zeros() as usize;
+            let north_ray = if north_obstacle != 64 {
+                 NORTH_ATTACKS[rook_index as usize] ^ NORTH_ATTACKS[north_obstacle]
+            }
+            else {
+                NORTH_ATTACKS[rook_index as usize]
+            };
+
+            let south_zeros = (SOUTH_ATTACKS[rook_index as usize] & occupancy).leading_zeros() as usize;
+            let south_ray = if south_zeros != 64 {
+                SOUTH_ATTACKS[rook_index as usize] ^ SOUTH_ATTACKS[63 - south_zeros]
+            } else {
+                SOUTH_ATTACKS[rook_index as usize]
+            };
+
+            let east_obstacle = (EAST_ATTACKS[rook_index as usize] & occupancy).trailing_zeros() as usize;
+            let east_ray = if east_obstacle != 64 {
+                EAST_ATTACKS[rook_index as usize] ^ EAST_ATTACKS[east_obstacle]
+            }
+            else {
+                EAST_ATTACKS[rook_index as usize]
+            };
+
+            let west_zeros = (WEST_ATTACKS[rook_index as usize] & occupancy).leading_zeros() as usize;
+            let west_ray = if west_zeros != 64 {
+                WEST_ATTACKS[rook_index as usize] ^ WEST_ATTACKS[63 - west_zeros]
+            } else {
+                WEST_ATTACKS[rook_index as usize]
+            };
+
+            let all_rays = north_ray | west_ray | south_ray | east_ray;
+            let mut normal_rays = all_rays & !occupancy;
+            let mut captures = all_rays & black_pieces;
+
+            while normal_rays != 0 {
+                rook_moves.push(Move{
+                    from: rook_index,
+                    to: normal_rays.trailing_zeros() as u8,
+                    flag: Flag::Normal,
+                });
+                normal_rays &= normal_rays - 1;
+            }
+            while captures != 0 {
+                rook_moves.push(Move{
+                    from: rook_index,
+                    to: captures.trailing_zeros() as u8,
+                    flag: Flag::Capture,
+                });
+                captures &= captures - 1;
+            }
+
+            white_rooks &= white_rooks - 1;
+        }
+    }
+    else {
+        let mut black_rooks = board.bitboards[r] | board.bitboards[q];
+        while black_rooks != 0 {
+            let rook_index = black_rooks.trailing_zeros() as u8;
+            let north_obstacle = (NORTH_ATTACKS[rook_index as usize] & occupancy).trailing_zeros() as usize;
+            let north_ray = if north_obstacle != 64 {
+                NORTH_ATTACKS[rook_index as usize] ^ NORTH_ATTACKS[north_obstacle]
+            } else {
+                NORTH_ATTACKS[rook_index as usize]
+            };
+
+            let south_zeros = (SOUTH_ATTACKS[rook_index as usize] & occupancy).leading_zeros() as usize;
+            let south_ray = if south_zeros != 64 {
+                SOUTH_ATTACKS[rook_index as usize] ^ SOUTH_ATTACKS[63 - south_zeros]
+            } else {
+                SOUTH_ATTACKS[rook_index as usize]
+            };
+
+            let east_obstacle = (EAST_ATTACKS[rook_index as usize] & occupancy).trailing_zeros() as usize;
+            let east_ray = if east_obstacle != 64 {
+                EAST_ATTACKS[rook_index as usize] ^ EAST_ATTACKS[east_obstacle]
+            } else {
+                EAST_ATTACKS[rook_index as usize]
+            };
+
+            let west_zeros = (WEST_ATTACKS[rook_index as usize] & occupancy).leading_zeros() as usize;
+            let west_ray = if west_zeros != 64 {
+                WEST_ATTACKS[rook_index as usize] ^ WEST_ATTACKS[63 - west_zeros]
+            } else {
+                WEST_ATTACKS[rook_index as usize]
+            };
+
+            let all_rays = north_ray | west_ray | south_ray | east_ray;
+            let mut normal_rays = all_rays & !occupancy;
+            let mut captures = all_rays & white_pieces;
+
+
+            while normal_rays != 0 {
+                rook_moves.push(Move {
+                    from: rook_index,
+                    to: normal_rays.trailing_zeros() as u8,
+                    flag: Flag::Normal,
+                });
+                normal_rays &= normal_rays - 1;
+            }
+            while captures != 0 {
+                rook_moves.push(Move{
+                    from: rook_index,
+                    to: captures.trailing_zeros() as u8,
+                    flag: Flag::Capture,
+                });
+                captures &= captures - 1;
+            }
+
+            black_rooks &= black_rooks - 1;
+        }
+    }
+
+    rook_moves
 }
 
 

@@ -286,6 +286,11 @@ impl GameState {
                     break;
                 }
             }
+
+            if captured_piece.is_none() {
+                panic!("Fatal: Move from {} to {} is flagged as Capture, but there is no enemy on the square!", mov.from, mov.to);
+            }
+
             for i in friendly_pieces_indexes { // Move
                 if (self.bitboards[i] & from_mask) != 0 {
                     self.bitboards[i] ^= move_mask;
