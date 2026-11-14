@@ -4,7 +4,7 @@
 //! Move is a simplified structure for saving moves as indexes (not bitboards) and a flag (that contains data about moves that require any special handling)
 
 use crate::board::{GameState, B, N, P, R, Q, K, p, n, b, r, q, k, SideToMove,};
-use crate::movespreloader::{KNIGHT_ATTACKS, KING_ATTACKS, NORTH_ATTACKS, SOUTH_ATTACKS, EAST_ATTACKS, WEST_ATTACKS};
+use crate::movespreloader::{KNIGHT_ATTACKS, KING_ATTACKS, NORTH_ATTACKS, SOUTH_ATTACKS, EAST_ATTACKS, WEST_ATTACKS, NORTH_EAST_ATTACKS, NORTH_WEST_ATTACKS, SOUTH_EAST_ATTACKS, SOUTH_WEST_ATTACKS};
 pub const RANK_2: u64 = 0x000000000000FF00;
 pub const RANK_7: u64 = 0x00FF000000000000;
 pub const FILE_A: u64 = 0x0101010101010101;
@@ -43,8 +43,10 @@ pub fn generate_moves(board: &GameState) -> Vec<Move> {
     let occupancy = white_pieces | black_pieces;
     moves.append(&mut generate_knight_moves(board, white_pieces, black_pieces));
     moves.append(&mut generate_king_moves(board, white_pieces, black_pieces, occupancy));
-    moves.append(&mut generate_pawn_moves(board, black_pieces, white_pieces, occupancy));
+    moves.append(&mut generate_pawn_moves(board, white_pieces, black_pieces, occupancy));
     moves.append(&mut generate_rook_moves(board, white_pieces, black_pieces, occupancy));
+    moves.append(&mut generate_bishop_moves(board, white_pieces, black_pieces, occupancy));
+
     moves
 }
 
@@ -221,7 +223,7 @@ fn generate_king_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
     king_moves
 }
 
-fn generate_pawn_moves(board: &GameState, black_pieces: u64, white_pieces: u64, occupancy: u64) -> Vec<Move> {
+fn generate_pawn_moves(board: &GameState, white_pieces: u64, black_pieces: u64, occupancy: u64) -> Vec<Move> {
     let mut pawn_moves = Vec::new();
     if board.side_to_move == SideToMove::White{
         let white_pawns = board.bitboards[P];
@@ -444,25 +446,7 @@ fn generate_rook_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
             };
 
             let all_rays = north_ray | west_ray | south_ray | east_ray;
-            let mut normal_rays = all_rays & !occupancy;
-            let mut captures = all_rays & black_pieces;
-
-            while normal_rays != 0 {
-                rook_moves.push(Move{
-                    from: rook_index,
-                    to: normal_rays.trailing_zeros() as u8,
-                    flag: Flag::Normal,
-                });
-                normal_rays &= normal_rays - 1;
-            }
-            while captures != 0 {
-                rook_moves.push(Move{
-                    from: rook_index,
-                    to: captures.trailing_zeros() as u8,
-                    flag: Flag::Capture,
-                });
-                captures &= captures - 1;
-            }
+            rook_moves.append(&mut rays_to_moves(rook_index, all_rays, occupancy, black_pieces));
 
             white_rooks &= white_rooks - 1;
         }
@@ -500,26 +484,7 @@ fn generate_rook_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
             };
 
             let all_rays = north_ray | west_ray | south_ray | east_ray;
-            let mut normal_rays = all_rays & !occupancy;
-            let mut captures = all_rays & white_pieces;
-
-
-            while normal_rays != 0 {
-                rook_moves.push(Move {
-                    from: rook_index,
-                    to: normal_rays.trailing_zeros() as u8,
-                    flag: Flag::Normal,
-                });
-                normal_rays &= normal_rays - 1;
-            }
-            while captures != 0 {
-                rook_moves.push(Move{
-                    from: rook_index,
-                    to: captures.trailing_zeros() as u8,
-                    flag: Flag::Capture,
-                });
-                captures &= captures - 1;
-            }
+            rook_moves.append(&mut rays_to_moves(rook_index, all_rays, occupancy, white_pieces));
 
             black_rooks &= black_rooks - 1;
         }
@@ -528,7 +493,103 @@ fn generate_rook_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
     rook_moves
 }
 
+fn generate_bishop_moves(board: &GameState, white_pieces: u64, black_pieces: u64, occupancy: u64) -> Vec<Move> {
+    let mut moves = Vec::new();
+    if board.side_to_move == SideToMove::White {
+        let mut white_bishops = board.bitboards[B] | board.bitboards[Q];
+        while white_bishops != 0 {
+            let bishop_index = white_bishops.trailing_zeros() as usize;
 
+            let northeast_obstacle = (NORTH_EAST_ATTACKS[bishop_index] & occupancy).trailing_zeros() as usize;
+            let northeast_ray = if northeast_obstacle != 64 {
+                NORTH_EAST_ATTACKS[bishop_index] ^ NORTH_EAST_ATTACKS[northeast_obstacle]
+            }
+            else { NORTH_EAST_ATTACKS[bishop_index] };
+
+            let northwest_obstacle = (NORTH_WEST_ATTACKS[bishop_index] & occupancy).trailing_zeros() as usize;
+            let northwest_ray = if northwest_obstacle != 64 {
+                NORTH_WEST_ATTACKS[bishop_index] ^ NORTH_WEST_ATTACKS[northwest_obstacle]
+            }
+            else { NORTH_WEST_ATTACKS[bishop_index] };
+
+            let southeast_obstacle = (SOUTH_EAST_ATTACKS[bishop_index] & occupancy).leading_zeros() as usize;
+            let southeast_ray = if southeast_obstacle != 64 {
+                SOUTH_EAST_ATTACKS[bishop_index] ^ SOUTH_EAST_ATTACKS[63 - southeast_obstacle]
+            }
+            else { SOUTH_EAST_ATTACKS[bishop_index] };
+
+            let southwest_obstacle = (SOUTH_WEST_ATTACKS[bishop_index] & occupancy).leading_zeros() as usize;
+            let southwest_ray = if southwest_obstacle != 64 {
+                SOUTH_WEST_ATTACKS[bishop_index] ^ SOUTH_WEST_ATTACKS[63 - southwest_obstacle]
+            }
+            else { SOUTH_WEST_ATTACKS[bishop_index] };
+
+            let all_rays = northeast_ray | northwest_ray | southeast_ray | southwest_ray;
+            moves.append(&mut rays_to_moves(bishop_index as u8, all_rays, occupancy, black_pieces));
+
+            white_bishops &= white_bishops - 1;
+        }
+    }
+    else {
+        let mut black_bishops = board.bitboards[b] | board.bitboards[q];
+        while black_bishops != 0 {
+            let bishop_index = black_bishops.trailing_zeros() as usize;
+
+            let northeast_obstacle = (NORTH_EAST_ATTACKS[bishop_index] & occupancy).trailing_zeros() as usize;
+            let northeast_ray = if northeast_obstacle != 64 {
+                NORTH_EAST_ATTACKS[bishop_index] ^ NORTH_EAST_ATTACKS[northeast_obstacle]
+            }
+            else { NORTH_EAST_ATTACKS[bishop_index] };
+
+            let northwest_obstacle = (NORTH_WEST_ATTACKS[bishop_index] & occupancy).trailing_zeros() as usize;
+            let northwest_ray = if northwest_obstacle != 64 {
+                NORTH_WEST_ATTACKS[bishop_index] ^ NORTH_WEST_ATTACKS[northwest_obstacle]
+            }
+            else { NORTH_WEST_ATTACKS[bishop_index] };
+
+            let southeast_obstacle = (SOUTH_EAST_ATTACKS[bishop_index] & occupancy).leading_zeros() as usize;
+            let southeast_ray = if southeast_obstacle != 64 {
+                SOUTH_EAST_ATTACKS[bishop_index] ^ SOUTH_EAST_ATTACKS[63 - southeast_obstacle]
+            }
+            else { SOUTH_EAST_ATTACKS[bishop_index] };
+
+            let southwest_obstacle = (SOUTH_WEST_ATTACKS[bishop_index] & occupancy).leading_zeros() as usize;
+            let southwest_ray = if southwest_obstacle != 64 {
+                SOUTH_WEST_ATTACKS[bishop_index] ^ SOUTH_WEST_ATTACKS[63 - southwest_obstacle]
+            }
+            else { SOUTH_WEST_ATTACKS[bishop_index] };
+
+            let all_rays = northeast_ray | northwest_ray | southeast_ray | southwest_ray;
+            moves.append(&mut rays_to_moves(bishop_index as u8, all_rays, occupancy, white_pieces));
+
+            black_bishops &= black_bishops - 1;
+        }
+    }
+    moves
+}
+
+fn rays_to_moves(my_index: u8, all_rays: u64, occupancy: u64, enemy_pieces: u64) -> Vec<Move> {
+    let mut moves = Vec::new();
+    let mut normal_rays = all_rays & !occupancy;
+    let mut captures = all_rays & enemy_pieces;
+    while normal_rays != 0 {
+        moves.push(Move {
+            from: my_index,
+            to: normal_rays.trailing_zeros() as u8,
+            flag: Flag::Normal,
+        });
+        normal_rays &= normal_rays - 1;
+    }
+    while captures != 0 {
+        moves.push(Move{
+            from: my_index,
+            to: captures.trailing_zeros() as u8,
+            flag: Flag::Capture,
+        });
+        captures &= captures - 1;
+    }
+    moves
+}
 
 
 #[cfg(test)]
