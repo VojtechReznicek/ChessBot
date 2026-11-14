@@ -46,7 +46,7 @@ pub fn parse_uci(input: &[String], board: &mut GameState, ascii_mode: bool) {
             }
 
 
-            if let Some(best_move) = root_negamax(board, 5) {
+            if let Some(best_move) = root_negamax(board, 4) {
                 let from_sq = index_to_algebraic(best_move.from);
                 let to_sq = index_to_algebraic(best_move.to);
 
@@ -79,7 +79,6 @@ pub fn get_input() -> Vec<String> {
 
 pub fn print_generated_moves(moves: &Vec<Move>) {
     println!("--- Generated {} pseudo-legal moves ---", moves.len());
-    println!("(Just for the king, knights and pawns at this point)\n");
     for m in moves {
         let from_sq = index_to_algebraic(m.from);
         let to_sq = index_to_algebraic(m.to);
