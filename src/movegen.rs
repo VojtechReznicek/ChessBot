@@ -43,7 +43,7 @@ pub fn generate_moves(board: &GameState) -> Vec<Move> {
     let occupancy = white_pieces | black_pieces;
     moves.append(&mut generate_knight_moves(board, white_pieces, black_pieces));
     moves.append(&mut generate_king_moves(board, white_pieces, black_pieces, occupancy));
-    moves.append(&mut generate_pawn_moves(board, white_pieces, black_pieces, occupancy));
+    moves.append(&mut generate_pawn_moves(board,white_pieces, black_pieces, occupancy));
     moves.append(&mut generate_rook_moves(board, white_pieces, black_pieces, occupancy));
     moves.append(&mut generate_bishop_moves(board, white_pieces, black_pieces, occupancy));
 
@@ -147,22 +147,25 @@ fn generate_king_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
             }
 
             if king_square == 4 { // Castle
-                if board.castling_rights.white_kingside {
-                    if (occupancy & ((1u64 << 5) | (1u64 << 6))) == 0 {  // White kingside castle move
-                        king_moves.push(Move{
-                            from: 4,
-                            to: 6,
-                            flag: Flag::CastleKingside
-                        })
+
+                if !board.is_attacked(king_square, false) {
+                    if board.castling_rights.white_kingside && !board.is_attacked(5, false) {
+                        if (occupancy & ((1u64 << 5) | (1u64 << 6))) == 0 {  // White kingside castle move
+                            king_moves.push(Move{
+                                from: 4,
+                                to: 6,
+                                flag: Flag::CastleKingside
+                            })
+                        }
                     }
-                }
-                if board.castling_rights.white_queenside {
-                    if (occupancy & ((1u64 << 1) | (1u64 << 2) | (1u64 << 3))) == 0 { // White queenside castle move
-                        king_moves.push(Move{
-                            from: 4,
-                            to: 2,
-                            flag: Flag::CastleQueenside
-                        })
+                    if board.castling_rights.white_queenside && !board.is_attacked(3, false)  {
+                        if (occupancy & ((1u64 << 1) | (1u64 << 2) | (1u64 << 3))) == 0 { // White queenside castle move
+                            king_moves.push(Move{
+                                from: 4,
+                                to: 2,
+                                flag: Flag::CastleQueenside
+                            })
+                        }
                     }
                 }
             }
@@ -196,25 +199,30 @@ fn generate_king_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
                 legal_captures_mask &= legal_captures_mask - 1;
             }
 
+
             if king_square == 60 { // Castle
-                if board.castling_rights.black_kingside {
-                    if (occupancy & ((1u64 << 61) | (1u64 << 62))) == 0 {  // Black kingside castle move
-                        king_moves.push(Move{
-                            from: 60,
-                            to: 62,
-                            flag: Flag::CastleKingside
-                        })
+                if !board.is_attacked(king_square, true) {
+                    if board.castling_rights.black_kingside && !board.is_attacked(61, true) {
+                        if (occupancy & ((1u64 << 61) | (1u64 << 62))) == 0 {  // Black kingside castle move
+                            king_moves.push(Move{
+                                from: 60,
+                                to: 62,
+                                flag: Flag::CastleKingside
+                            })
+                        }
+                    }
+                    if board.castling_rights.black_queenside && !board.is_attacked(59, true) {
+                        if (occupancy & ((1u64 << 57) | (1u64 << 58) | (1u64 << 59))) == 0 { // Black queenside castle move
+                            king_moves.push(Move{
+                                from: 60,
+                                to: 58,
+                                flag: Flag::CastleQueenside
+                            })
+                        }
                     }
                 }
-                if board.castling_rights.black_queenside {
-                    if (occupancy & ((1u64 << 57) | (1u64 << 58) | (1u64 << 59))) == 0 { // Black queenside castle move
-                        king_moves.push(Move{
-                            from: 60,
-                            to: 58,
-                            flag: Flag::CastleKingside
-                        })
-                    }
-                }
+
+
             }
             black_kings &= black_kings - 1;
         }

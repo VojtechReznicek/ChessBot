@@ -2,7 +2,7 @@
 //! It always returns a value from the perspective of the player whose turn it is.
 //! If the position is good, the value is positive, otherwise the value is negative
 
-use crate::board::{GameState, P, p, N, n, B, b, R, r, Q, q, K, k, SideToMove};
+use crate::board::{GameState, P, p, N, n, B, b, R, r, Q, q, SideToMove};
 use crate::movegen::{FILE_A, FILE_H};
 
 const PIECE_VALUES: [i32; 12] = [
@@ -14,7 +14,6 @@ pub fn evaluate(board: &GameState) -> i32 {
     let white_active_pieces = board.bitboards[P] | board.bitboards[N] | board.bitboards[B] | board.bitboards[R] | board.bitboards[Q];
     let black_active_pieces = board.bitboards[p] | board.bitboards[n] | board.bitboards[b] | board.bitboards[r] | board.bitboards[q];
     let mut value: i32 = 0;
-    value += king_alive(board);
     value += count_pure_material_value(board);
     value += pawns_covering_bonus(board);
     value += aggression_bonus(white_active_pieces, black_active_pieces);
@@ -23,16 +22,6 @@ pub fn evaluate(board: &GameState) -> i32 {
     value
 }
 
-fn king_alive(board: &GameState) -> i32 {
-    let mut value: i32 = 0;
-    value += if board.bitboards[K] != 0 { 30_000 }
-        else { 0 };
-
-    value -= if board.bitboards[k] != 0 { 30_000 }
-        else { 0 };
-
-    value
-}
 
 fn count_pure_material_value(board: &GameState) -> i32 {
     let mut value: i32 = 0;

@@ -7,7 +7,8 @@
 #![allow(non_upper_case_globals)]
 
 use crate::board::SideToMove::{Black, White};
-use crate::movegen::{Flag, Move};
+use crate::movegen::{Flag, Move, FILE_A, FILE_H};
+use crate::movespreloader::{EAST_ATTACKS, KING_ATTACKS, KNIGHT_ATTACKS, NORTH_ATTACKS, NORTH_EAST_ATTACKS, NORTH_WEST_ATTACKS, SOUTH_ATTACKS, SOUTH_EAST_ATTACKS, SOUTH_WEST_ATTACKS, WEST_ATTACKS};
 
 pub const P: usize = 0;
 pub const N: usize = 1;
@@ -525,6 +526,71 @@ impl GameState {
             }
         }
     }
+
+    pub fn is_attacked(&self, square: u8, attacked_by_white: bool) -> bool {
+        let occupancy = self.bitboards[P] | self.bitboards[N] | self.bitboards[B] | self.bitboards[R] | self.bitboards[Q] | self.bitboards[K]
+            | self.bitboards[p] | self.bitboards[n] | self.bitboards[b] | self.bitboards[r] | self.bitboards[q] | self.bitboards[k];
+        let sq = square as usize;
+        let sq_mask = 1u64 << square;
+
+        let (enemy_pawns, enemy_knights, enemy_bishops, enemy_rooks, enemy_queens, enemy_king) = if attacked_by_white {
+            (self.bitboards[P], self.bitboards[N], self.bitboards[B], self.bitboards[R], self.bitboards[Q], self.bitboards[K])
+        } else {
+            (self.bitboards[p], self.bitboards[n], self.bitboards[b], self.bitboards[r], self.bitboards[q], self.bitboards[k])
+        };
+
+
+        if (KNIGHT_ATTACKS[sq] & enemy_knights) != 0 { return true; }
+
+
+        if (KING_ATTACKS[sq] & enemy_king) != 0 { return true; }
+
+
+        if attacked_by_white {
+            let pawn_attacks = ((sq_mask & !FILE_A) >> 9) | ((sq_mask & !FILE_H) >> 7);
+            if (pawn_attacks & enemy_pawns) != 0 { return true; }
+        } else {
+            let pawn_attacks = ((sq_mask & !FILE_A) << 7) | ((sq_mask & !FILE_H) << 9);
+            if (pawn_attacks & enemy_pawns) != 0 { return true; }
+        }
+
+
+        let north_obs = (NORTH_ATTACKS[sq] & occupancy).trailing_zeros() as usize;
+        let north_ray = if north_obs != 64 { NORTH_ATTACKS[sq] ^ NORTH_ATTACKS[north_obs] } else { NORTH_ATTACKS[sq] };
+
+        let south_zeros = (SOUTH_ATTACKS[sq] & occupancy).leading_zeros() as usize;
+        let south_ray = if south_zeros != 64 { SOUTH_ATTACKS[sq] ^ SOUTH_ATTACKS[63 - south_zeros] } else { SOUTH_ATTACKS[sq] };
+
+        let east_obs = (EAST_ATTACKS[sq] & occupancy).trailing_zeros() as usize;
+        let east_ray = if east_obs != 64 { EAST_ATTACKS[sq] ^ EAST_ATTACKS[east_obs] } else { EAST_ATTACKS[sq] };
+
+        let west_zeros = (WEST_ATTACKS[sq] & occupancy).leading_zeros() as usize;
+        let west_ray = if west_zeros != 64 { WEST_ATTACKS[sq] ^ WEST_ATTACKS[63 - west_zeros] } else { WEST_ATTACKS[sq] };
+
+        if (north_ray | south_ray | east_ray | west_ray) & (enemy_rooks | enemy_queens) != 0 {
+            return true;
+        }
+
+
+        let north_obs = (NORTH_WEST_ATTACKS[sq] & occupancy).trailing_zeros() as usize;
+        let north_west_ray = if north_obs != 64 { NORTH_WEST_ATTACKS[sq] ^ NORTH_WEST_ATTACKS[north_obs] } else { NORTH_WEST_ATTACKS[sq] };
+
+        let north_obs = (NORTH_EAST_ATTACKS[sq] & occupancy).trailing_zeros() as usize;
+        let north_east_ray = if north_obs != 64 { NORTH_EAST_ATTACKS[sq] ^ NORTH_EAST_ATTACKS[north_obs] } else { NORTH_EAST_ATTACKS[sq] };
+
+        let south_zeros = (SOUTH_WEST_ATTACKS[sq] & occupancy).leading_zeros() as usize;
+        let south_west_ray = if south_zeros != 64 { SOUTH_WEST_ATTACKS[sq] ^ SOUTH_WEST_ATTACKS[63 - south_zeros] } else { SOUTH_WEST_ATTACKS[sq] };
+
+        let south_zeros = (SOUTH_EAST_ATTACKS[sq] & occupancy).leading_zeros() as usize;
+        let south_east_ray = if south_zeros != 64 { SOUTH_EAST_ATTACKS[sq] ^ SOUTH_EAST_ATTACKS[63 - south_zeros] } else { SOUTH_EAST_ATTACKS[sq] };
+
+        if (north_west_ray | north_east_ray | south_west_ray | south_east_ray) & (enemy_bishops | enemy_queens) != 0 {
+            return true;
+        }
+
+        false
+    }
+
 }
 
 
