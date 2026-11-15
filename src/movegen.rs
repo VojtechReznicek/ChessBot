@@ -52,183 +52,136 @@ pub fn generate_moves(board: &GameState) -> Vec<Move> {
 
 fn generate_knight_moves(board: &GameState, white_pieces: u64, black_pieces: u64) -> Vec<Move> {
     let mut knight_moves = Vec::new();
+    let (mut knights, friendly_pieces, enemy_pieces) = if board.side_to_move == SideToMove::White {
+        (board.bitboards[N], white_pieces, black_pieces)
+    } else {
+        (board.bitboards[n], black_pieces, white_pieces)
+    };
 
-
-    if board.side_to_move == SideToMove::White{
-        let mut white_knights = board.bitboards[N];
-        while white_knights != 0 {
-            let knight_square = white_knights.trailing_zeros() as u8;
-            let mut legal_moves_mask = KNIGHT_ATTACKS[knight_square as usize] & !white_pieces;
-            let mut legal_captures_mask = legal_moves_mask & black_pieces;
-            legal_moves_mask &= !black_pieces;
-            while legal_moves_mask != 0 {  // Without capture
-                let to_index = legal_moves_mask.trailing_zeros() as u8;
-                knight_moves.push(Move {
-                    from: knight_square,
-                    to: to_index,
-                    flag: Flag::Normal
-                });
-                legal_moves_mask &= legal_moves_mask - 1;
-            }
-            while legal_captures_mask != 0 {
-                let to_index = legal_captures_mask.trailing_zeros() as u8;
-                knight_moves.push(Move{
-                    from: knight_square,
-                    to: to_index,
-                    flag: Flag::Capture
-                });
-                legal_captures_mask &= legal_captures_mask - 1;
-            }
-
-            white_knights &= white_knights - 1;
+    while knights != 0 {
+        let knight_square = knights.trailing_zeros() as u8;
+        let mut legal_moves_mask = KNIGHT_ATTACKS[knight_square as usize] & !friendly_pieces;
+        let mut legal_captures_mask = legal_moves_mask & enemy_pieces;
+        legal_moves_mask &= !enemy_pieces;
+        while legal_moves_mask != 0 {  // Without capture
+            let to_index = legal_moves_mask.trailing_zeros() as u8;
+            knight_moves.push(Move {
+                from: knight_square,
+                to: to_index,
+                flag: Flag::Normal
+            });
+            legal_moves_mask &= legal_moves_mask - 1;
         }
-    }
-    else {
-        let mut black_knights = board.bitboards[n];
-        while black_knights != 0 {
-            let knight_square = black_knights.trailing_zeros() as u8;
-            let mut legal_moves_mask = KNIGHT_ATTACKS[knight_square as usize] & !black_pieces;
-            let mut legal_captures_mask = legal_moves_mask & white_pieces;
-            legal_moves_mask &= !white_pieces;
-            while legal_moves_mask != 0 {
-                let to_index = legal_moves_mask.trailing_zeros() as u8;
-                knight_moves.push(Move {
-                    from: knight_square,
-                    to: to_index,
-                    flag: Flag::Normal
-                });
-                legal_moves_mask &= legal_moves_mask - 1;
-            }
-            while legal_captures_mask != 0 {
-                let to_index = legal_captures_mask.trailing_zeros() as u8;
-                knight_moves.push(Move{
-                    from: knight_square,
-                    to: to_index,
-                    flag: Flag::Capture
-                });
-                legal_captures_mask &= legal_captures_mask - 1;
-            }
-
-            black_knights &= black_knights - 1;
+        while legal_captures_mask != 0 {
+            let to_index = legal_captures_mask.trailing_zeros() as u8;
+            knight_moves.push(Move{
+                from: knight_square,
+                to: to_index,
+                flag: Flag::Capture
+            });
+            legal_captures_mask &= legal_captures_mask - 1;
         }
-    }
 
+        knights &= knights - 1;
+    }
     knight_moves
 }
 
 
 
+
 fn generate_king_moves(board: &GameState, white_pieces: u64, black_pieces: u64, occupancy: u64) -> Vec<Move> {
     let mut king_moves = Vec::new();
-    if board.side_to_move == SideToMove::White {
-        let mut white_kings = board.bitboards[K];
-        while white_kings != 0 {
-            let king_square = white_kings.trailing_zeros() as u8;
-            let mut legal_moves_mask = KING_ATTACKS[king_square as usize] & !white_pieces;  // This ignores getting the king into a check
-            let mut legal_captures_mask = legal_moves_mask & black_pieces;
-            legal_moves_mask &= !black_pieces;
-            while legal_moves_mask != 0 {
-                let to_index = legal_moves_mask.trailing_zeros() as u8;
-                king_moves.push(Move { // Normal king move
-                    from: king_square,
-                    to: to_index,
-                    flag: Flag::Normal
-                });
-                legal_moves_mask &= legal_moves_mask - 1;
-            }
-            while legal_captures_mask != 0 {
-                let to_index = legal_captures_mask.trailing_zeros() as u8;
-                king_moves.push(Move{
-                    from: king_square,
-                    to: to_index,
-                    flag: Flag::Capture
-                });
-                legal_captures_mask &= legal_captures_mask - 1;
-            }
 
-            if king_square == 4 { // Castle
+    let (mut kings, friendly_pieces, enemy_pieces) = if board.side_to_move == SideToMove::White {
+        (board.bitboards[K], white_pieces, black_pieces)
+    } else {
+        (board.bitboards[k], black_pieces, white_pieces)
+    };
 
-                if !board.is_attacked(king_square, false) {
-                    if board.castling_rights.white_kingside && !board.is_attacked(5, false) {
-                        if (occupancy & ((1u64 << 5) | (1u64 << 6))) == 0 {  // White kingside castle move
-                            king_moves.push(Move{
-                                from: 4,
-                                to: 6,
-                                flag: Flag::CastleKingside
-                            })
-                        }
-                    }
-                    if board.castling_rights.white_queenside && !board.is_attacked(3, false)  {
-                        if (occupancy & ((1u64 << 1) | (1u64 << 2) | (1u64 << 3))) == 0 { // White queenside castle move
-                            king_moves.push(Move{
-                                from: 4,
-                                to: 2,
-                                flag: Flag::CastleQueenside
-                            })
-                        }
-                    }
-                }
-            }
 
-            white_kings &= white_kings - 1;
+    while kings != 0 {
+        let king_square = kings.trailing_zeros() as u8;
+        let mut legal_moves_mask = KING_ATTACKS[king_square as usize] & !friendly_pieces;  // This ignores getting the king into a check
+        let mut legal_captures_mask = legal_moves_mask & enemy_pieces;
+        legal_moves_mask &= !enemy_pieces;
+        while legal_moves_mask != 0 {
+            let to_index = legal_moves_mask.trailing_zeros() as u8;
+            king_moves.push(Move { // Normal king move
+                from: king_square,
+                to: to_index,
+                flag: Flag::Normal
+            });
+            legal_moves_mask &= legal_moves_mask - 1;
         }
-    }
-    else {
-        let mut black_kings = board.bitboards[k];
-        while black_kings != 0 {
-            let king_square = black_kings.trailing_zeros() as u8;
-            let mut legal_moves_mask = KING_ATTACKS[king_square as usize] & !black_pieces;
-            let mut legal_captures_mask = legal_moves_mask & white_pieces;
-            legal_moves_mask &= !white_pieces;
-            while legal_moves_mask != 0 { // Normal king move
-                let to_index = legal_moves_mask.trailing_zeros() as u8;
-                king_moves.push(Move {
-                    from: king_square,
-                    to: to_index,
-                    flag: Flag::Normal
-                });
-                legal_moves_mask &= legal_moves_mask - 1;
-            }
-            while legal_captures_mask != 0 {
-                let to_index = legal_captures_mask.trailing_zeros() as u8;
-                king_moves.push(Move{
-                    from: king_square,
-                    to: to_index,
-                    flag: Flag::Capture
-                });
-                legal_captures_mask &= legal_captures_mask - 1;
-            }
-
-
-            if king_square == 60 { // Castle
-                if !board.is_attacked(king_square, true) {
-                    if board.castling_rights.black_kingside && !board.is_attacked(61, true) {
-                        if (occupancy & ((1u64 << 61) | (1u64 << 62))) == 0 {  // Black kingside castle move
-                            king_moves.push(Move{
-                                from: 60,
-                                to: 62,
-                                flag: Flag::CastleKingside
-                            })
-                        }
-                    }
-                    if board.castling_rights.black_queenside && !board.is_attacked(59, true) {
-                        if (occupancy & ((1u64 << 57) | (1u64 << 58) | (1u64 << 59))) == 0 { // Black queenside castle move
-                            king_moves.push(Move{
-                                from: 60,
-                                to: 58,
-                                flag: Flag::CastleQueenside
-                            })
-                        }
-                    }
-                }
-
-
-            }
-            black_kings &= black_kings - 1;
+        while legal_captures_mask != 0 {
+            let to_index = legal_captures_mask.trailing_zeros() as u8;
+            king_moves.push(Move{
+                from: king_square,
+                to: to_index,
+                flag: Flag::Capture
+            });
+            legal_captures_mask &= legal_captures_mask - 1;
         }
+
+        king_moves.append(check_for_castle(board, king_square, occupancy).as_mut());
+
+        kings &= kings - 1;
     }
 
     king_moves
+}
+
+fn check_for_castle(board: &GameState, king_square: u8, occupancy: u64) -> Vec<Move> {
+    let mut result: Vec<Move> = Vec::new();
+    if king_square == 4 { // Castle
+
+        if !board.is_attacked(king_square, false) {
+            if board.castling_rights.white_kingside && !board.is_attacked(5, false) {
+                if (occupancy & ((1u64 << 5) | (1u64 << 6))) == 0 {  // White kingside castle move
+                    result.push(Move{
+                        from: 4,
+                        to: 6,
+                        flag: Flag::CastleKingside
+                    })
+                }
+            }
+            if board.castling_rights.white_queenside && !board.is_attacked(3, false)  {
+                if (occupancy & ((1u64 << 1) | (1u64 << 2) | (1u64 << 3))) == 0 { // White queenside castle move
+                    result.push(Move{
+                        from: 4,
+                        to: 2,
+                        flag: Flag::CastleQueenside
+                    })
+                }
+            }
+        }
+    }
+
+    else if king_square == 60 { // Castle
+        if !board.is_attacked(king_square, true) {
+            if board.castling_rights.black_kingside && !board.is_attacked(61, true) {
+                if (occupancy & ((1u64 << 61) | (1u64 << 62))) == 0 {  // Black kingside castle move
+                    result.push(Move{
+                        from: 60,
+                        to: 62,
+                        flag: Flag::CastleKingside
+                    })
+                }
+            }
+            if board.castling_rights.black_queenside && !board.is_attacked(59, true) {
+                if (occupancy & ((1u64 << 57) | (1u64 << 58) | (1u64 << 59))) == 0 { // Black queenside castle move
+                    result.push(Move{
+                        from: 60,
+                        to: 58,
+                        flag: Flag::CastleQueenside
+                    });
+                }
+            }
+        }
+
+    }
+    result
 }
 
 fn generate_pawn_moves(board: &GameState, white_pieces: u64, black_pieces: u64, occupancy: u64) -> Vec<Move> {
@@ -419,160 +372,97 @@ fn generate_pawn_moves(board: &GameState, white_pieces: u64, black_pieces: u64, 
 
 fn generate_rook_moves(board: &GameState, white_pieces: u64, black_pieces: u64, occupancy: u64) -> Vec<Move> {
     let mut rook_moves = Vec::new();
-    if board.side_to_move == SideToMove::White {
-        let mut white_rooks = board.bitboards[R] | board.bitboards[Q];
-        while white_rooks != 0 {
-            let rook_index = white_rooks.trailing_zeros() as u8;
-            let north_obstacle = (NORTH_ATTACKS[rook_index as usize] & occupancy).trailing_zeros() as usize;
-            let north_ray = if north_obstacle != 64 {
-                 NORTH_ATTACKS[rook_index as usize] ^ NORTH_ATTACKS[north_obstacle]
-            }
-            else {
-                NORTH_ATTACKS[rook_index as usize]
-            };
 
-            let south_zeros = (SOUTH_ATTACKS[rook_index as usize] & occupancy).leading_zeros() as usize;
-            let south_ray = if south_zeros != 64 {
-                SOUTH_ATTACKS[rook_index as usize] ^ SOUTH_ATTACKS[63 - south_zeros]
-            } else {
-                SOUTH_ATTACKS[rook_index as usize]
-            };
+    let (mut rooks, enemy_pieces) = if board.side_to_move == SideToMove::White {
+        (board.bitboards[R] | board.bitboards[Q], black_pieces)
+    } else {
+        (board.bitboards[r] | board.bitboards[q], white_pieces)
+    };
 
-            let east_obstacle = (EAST_ATTACKS[rook_index as usize] & occupancy).trailing_zeros() as usize;
-            let east_ray = if east_obstacle != 64 {
-                EAST_ATTACKS[rook_index as usize] ^ EAST_ATTACKS[east_obstacle]
-            }
-            else {
-                EAST_ATTACKS[rook_index as usize]
-            };
-
-            let west_zeros = (WEST_ATTACKS[rook_index as usize] & occupancy).leading_zeros() as usize;
-            let west_ray = if west_zeros != 64 {
-                WEST_ATTACKS[rook_index as usize] ^ WEST_ATTACKS[63 - west_zeros]
-            } else {
-                WEST_ATTACKS[rook_index as usize]
-            };
-
-            let all_rays = north_ray | west_ray | south_ray | east_ray;
-            rook_moves.append(&mut rays_to_moves(rook_index, all_rays, occupancy, black_pieces));
-
-            white_rooks &= white_rooks - 1;
+    while rooks != 0 {
+        let rook_index = rooks.trailing_zeros() as u8;
+        let north_obstacle = (NORTH_ATTACKS[rook_index as usize] & occupancy).trailing_zeros() as usize;
+        let north_ray = if north_obstacle != 64 {
+             NORTH_ATTACKS[rook_index as usize] ^ NORTH_ATTACKS[north_obstacle]
         }
-    }
-    else {
-        let mut black_rooks = board.bitboards[r] | board.bitboards[q];
-        while black_rooks != 0 {
-            let rook_index = black_rooks.trailing_zeros() as u8;
-            let north_obstacle = (NORTH_ATTACKS[rook_index as usize] & occupancy).trailing_zeros() as usize;
-            let north_ray = if north_obstacle != 64 {
-                NORTH_ATTACKS[rook_index as usize] ^ NORTH_ATTACKS[north_obstacle]
-            } else {
-                NORTH_ATTACKS[rook_index as usize]
-            };
+        else {
+            NORTH_ATTACKS[rook_index as usize]
+        };
 
-            let south_zeros = (SOUTH_ATTACKS[rook_index as usize] & occupancy).leading_zeros() as usize;
-            let south_ray = if south_zeros != 64 {
-                SOUTH_ATTACKS[rook_index as usize] ^ SOUTH_ATTACKS[63 - south_zeros]
-            } else {
-                SOUTH_ATTACKS[rook_index as usize]
-            };
+        let south_zeros = (SOUTH_ATTACKS[rook_index as usize] & occupancy).leading_zeros() as usize;
+        let south_ray = if south_zeros != 64 {
+            SOUTH_ATTACKS[rook_index as usize] ^ SOUTH_ATTACKS[63 - south_zeros]
+        } else {
+            SOUTH_ATTACKS[rook_index as usize]
+        };
 
-            let east_obstacle = (EAST_ATTACKS[rook_index as usize] & occupancy).trailing_zeros() as usize;
-            let east_ray = if east_obstacle != 64 {
-                EAST_ATTACKS[rook_index as usize] ^ EAST_ATTACKS[east_obstacle]
-            } else {
-                EAST_ATTACKS[rook_index as usize]
-            };
-
-            let west_zeros = (WEST_ATTACKS[rook_index as usize] & occupancy).leading_zeros() as usize;
-            let west_ray = if west_zeros != 64 {
-                WEST_ATTACKS[rook_index as usize] ^ WEST_ATTACKS[63 - west_zeros]
-            } else {
-                WEST_ATTACKS[rook_index as usize]
-            };
-
-            let all_rays = north_ray | west_ray | south_ray | east_ray;
-            rook_moves.append(&mut rays_to_moves(rook_index, all_rays, occupancy, white_pieces));
-
-            black_rooks &= black_rooks - 1;
+        let east_obstacle = (EAST_ATTACKS[rook_index as usize] & occupancy).trailing_zeros() as usize;
+        let east_ray = if east_obstacle != 64 {
+            EAST_ATTACKS[rook_index as usize] ^ EAST_ATTACKS[east_obstacle]
         }
+        else {
+            EAST_ATTACKS[rook_index as usize]
+        };
+
+        let west_zeros = (WEST_ATTACKS[rook_index as usize] & occupancy).leading_zeros() as usize;
+        let west_ray = if west_zeros != 64 {
+            WEST_ATTACKS[rook_index as usize] ^ WEST_ATTACKS[63 - west_zeros]
+        } else {
+            WEST_ATTACKS[rook_index as usize]
+        };
+
+        let all_rays = north_ray | west_ray | south_ray | east_ray;
+        rook_moves.append(&mut rays_to_moves(rook_index, all_rays, occupancy, enemy_pieces));
+
+        rooks &= rooks - 1;
     }
+
 
     rook_moves
 }
 
 fn generate_bishop_moves(board: &GameState, white_pieces: u64, black_pieces: u64, occupancy: u64) -> Vec<Move> {
     let mut moves = Vec::new();
-    if board.side_to_move == SideToMove::White {
-        let mut white_bishops = board.bitboards[B] | board.bitboards[Q];
-        while white_bishops != 0 {
-            let bishop_index = white_bishops.trailing_zeros() as usize;
 
-            let northeast_obstacle = (NORTH_EAST_ATTACKS[bishop_index] & occupancy).trailing_zeros() as usize;
-            let northeast_ray = if northeast_obstacle != 64 {
-                NORTH_EAST_ATTACKS[bishop_index] ^ NORTH_EAST_ATTACKS[northeast_obstacle]
-            }
-            else { NORTH_EAST_ATTACKS[bishop_index] };
+    let (mut bishops, enemy_pieces) = if board.side_to_move == SideToMove::White {
+        (board.bitboards[B] | board.bitboards[Q], black_pieces)
+    } else {
+        (board.bitboards[b] | board.bitboards[q], white_pieces)
+    };
 
-            let northwest_obstacle = (NORTH_WEST_ATTACKS[bishop_index] & occupancy).trailing_zeros() as usize;
-            let northwest_ray = if northwest_obstacle != 64 {
-                NORTH_WEST_ATTACKS[bishop_index] ^ NORTH_WEST_ATTACKS[northwest_obstacle]
-            }
-            else { NORTH_WEST_ATTACKS[bishop_index] };
+    while bishops != 0 {
+        let bishop_index = bishops.trailing_zeros() as usize;
 
-            let southeast_obstacle = (SOUTH_EAST_ATTACKS[bishop_index] & occupancy).leading_zeros() as usize;
-            let southeast_ray = if southeast_obstacle != 64 {
-                SOUTH_EAST_ATTACKS[bishop_index] ^ SOUTH_EAST_ATTACKS[63 - southeast_obstacle]
-            }
-            else { SOUTH_EAST_ATTACKS[bishop_index] };
-
-            let southwest_obstacle = (SOUTH_WEST_ATTACKS[bishop_index] & occupancy).leading_zeros() as usize;
-            let southwest_ray = if southwest_obstacle != 64 {
-                SOUTH_WEST_ATTACKS[bishop_index] ^ SOUTH_WEST_ATTACKS[63 - southwest_obstacle]
-            }
-            else { SOUTH_WEST_ATTACKS[bishop_index] };
-
-            let all_rays = northeast_ray | northwest_ray | southeast_ray | southwest_ray;
-            moves.append(&mut rays_to_moves(bishop_index as u8, all_rays, occupancy, black_pieces));
-
-            white_bishops &= white_bishops - 1;
+        let northeast_obstacle = (NORTH_EAST_ATTACKS[bishop_index] & occupancy).trailing_zeros() as usize;
+        let northeast_ray = if northeast_obstacle != 64 {
+            NORTH_EAST_ATTACKS[bishop_index] ^ NORTH_EAST_ATTACKS[northeast_obstacle]
         }
-    }
-    else {
-        let mut black_bishops = board.bitboards[b] | board.bitboards[q];
-        while black_bishops != 0 {
-            let bishop_index = black_bishops.trailing_zeros() as usize;
+        else { NORTH_EAST_ATTACKS[bishop_index] };
 
-            let northeast_obstacle = (NORTH_EAST_ATTACKS[bishop_index] & occupancy).trailing_zeros() as usize;
-            let northeast_ray = if northeast_obstacle != 64 {
-                NORTH_EAST_ATTACKS[bishop_index] ^ NORTH_EAST_ATTACKS[northeast_obstacle]
-            }
-            else { NORTH_EAST_ATTACKS[bishop_index] };
-
-            let northwest_obstacle = (NORTH_WEST_ATTACKS[bishop_index] & occupancy).trailing_zeros() as usize;
-            let northwest_ray = if northwest_obstacle != 64 {
-                NORTH_WEST_ATTACKS[bishop_index] ^ NORTH_WEST_ATTACKS[northwest_obstacle]
-            }
-            else { NORTH_WEST_ATTACKS[bishop_index] };
-
-            let southeast_obstacle = (SOUTH_EAST_ATTACKS[bishop_index] & occupancy).leading_zeros() as usize;
-            let southeast_ray = if southeast_obstacle != 64 {
-                SOUTH_EAST_ATTACKS[bishop_index] ^ SOUTH_EAST_ATTACKS[63 - southeast_obstacle]
-            }
-            else { SOUTH_EAST_ATTACKS[bishop_index] };
-
-            let southwest_obstacle = (SOUTH_WEST_ATTACKS[bishop_index] & occupancy).leading_zeros() as usize;
-            let southwest_ray = if southwest_obstacle != 64 {
-                SOUTH_WEST_ATTACKS[bishop_index] ^ SOUTH_WEST_ATTACKS[63 - southwest_obstacle]
-            }
-            else { SOUTH_WEST_ATTACKS[bishop_index] };
-
-            let all_rays = northeast_ray | northwest_ray | southeast_ray | southwest_ray;
-            moves.append(&mut rays_to_moves(bishop_index as u8, all_rays, occupancy, white_pieces));
-
-            black_bishops &= black_bishops - 1;
+        let northwest_obstacle = (NORTH_WEST_ATTACKS[bishop_index] & occupancy).trailing_zeros() as usize;
+        let northwest_ray = if northwest_obstacle != 64 {
+            NORTH_WEST_ATTACKS[bishop_index] ^ NORTH_WEST_ATTACKS[northwest_obstacle]
         }
+        else { NORTH_WEST_ATTACKS[bishop_index] };
+
+        let southeast_obstacle = (SOUTH_EAST_ATTACKS[bishop_index] & occupancy).leading_zeros() as usize;
+        let southeast_ray = if southeast_obstacle != 64 {
+            SOUTH_EAST_ATTACKS[bishop_index] ^ SOUTH_EAST_ATTACKS[63 - southeast_obstacle]
+        }
+        else { SOUTH_EAST_ATTACKS[bishop_index] };
+
+        let southwest_obstacle = (SOUTH_WEST_ATTACKS[bishop_index] & occupancy).leading_zeros() as usize;
+        let southwest_ray = if southwest_obstacle != 64 {
+            SOUTH_WEST_ATTACKS[bishop_index] ^ SOUTH_WEST_ATTACKS[63 - southwest_obstacle]
+        }
+        else { SOUTH_WEST_ATTACKS[bishop_index] };
+
+        let all_rays = northeast_ray | northwest_ray | southeast_ray | southwest_ray;
+        moves.append(&mut rays_to_moves(bishop_index as u8, all_rays, occupancy, enemy_pieces));
+
+        bishops &= bishops - 1;
     }
+
     moves
 }
 
