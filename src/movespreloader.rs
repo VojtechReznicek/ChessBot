@@ -190,7 +190,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_leaping_moves_symetry() {
+    fn test_leaping_moves_symmetry() {
         for i in 0..64 {
             let mut moves = KNIGHT_ATTACKS[i];
             while moves != 0 {

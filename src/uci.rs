@@ -46,15 +46,15 @@ pub fn parse_uci(input: &[String], board: &mut GameState, ascii_mode: bool) {
             }
 
 
-            if let Some(best_move) = root_negamax(board, 4) {
+            if let Some(best_move) = root_negamax(board, 5) {
                 let from_sq = index_to_algebraic(best_move.from);
                 let to_sq = index_to_algebraic(best_move.to);
 
                 let flag_char = match best_move.flag {
-                    crate::movegen::Flag::PromoteQueen | crate::movegen::Flag::PromoteQueenCapture => "q",
-                    crate::movegen::Flag::PromoteRook | crate::movegen::Flag::PromoteRookCapture => "r",
-                    crate::movegen::Flag::PromoteBishop | crate::movegen::Flag::PromoteBishopCapture => "b",
-                    crate::movegen::Flag::PromoteKnight | crate::movegen::Flag::PromoteKnightCapture => "n",
+                    Flag::PromoteQueen | Flag::PromoteQueenCapture => "q",
+                    Flag::PromoteRook | Flag::PromoteRookCapture => "r",
+                    Flag::PromoteBishop | Flag::PromoteBishopCapture => "b",
+                    Flag::PromoteKnight | Flag::PromoteKnightCapture => "n",
                     _ => "",
                 };
 

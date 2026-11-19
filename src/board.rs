@@ -72,7 +72,7 @@ impl GameState {
         pieces[q] = 0x0800_0000_0000_0000;
         pieces[k] = 0x1000_0000_0000_0000;
 
-        let side_to_move = SideToMove::White;
+        let side_to_move = White;
         let castling_rights= CastlingRights{
             white_queenside: true,
             white_kingside: true,
@@ -87,10 +87,10 @@ impl GameState {
 
     pub fn make_uci_moves(&mut self, moves: &[String]) {
         if moves.len() % 2 == 0 {
-            self.side_to_move = SideToMove::White;
+            self.side_to_move = White;
         }
         else {
-            self.side_to_move = SideToMove::Black;
+            self.side_to_move = Black;
         }
         for m in moves {
 
@@ -410,7 +410,7 @@ impl GameState {
         }
 
         if self.side_to_move == White {
-            self.side_to_move = SideToMove::Black;
+            self.side_to_move = Black;
         }
         else {
             self.side_to_move = White;
@@ -591,6 +591,16 @@ impl GameState {
         false
     }
 
+    pub fn index_pos_to_piece_type(&self, index: u8) -> usize {
+        let pos = 1u64 << index;
+        for (i, &board) in self.bitboards.iter().enumerate() {
+            if board & pos != 0 {
+                return i;
+            }
+        }
+        panic!("Nothing at this index!");
+    }
+
 }
 
 
@@ -682,7 +692,7 @@ mod tests {
         let mut g = GameState::new();
         g.bitboards[b] &= !(1u64 << 61); // clear f8
         g.bitboards[n] &= !(1u64 << 62); // clear g8
-        g.side_to_move = SideToMove::Black;
+        g.side_to_move = Black;
 
         let castle = crate::movegen::generate_moves(&g)
             .into_iter()

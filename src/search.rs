@@ -4,8 +4,11 @@
 //! Returning values are simply negated between plies (what is great for White is equally terrible for Black).
 
 use crate::board::{GameState, SideToMove, k, K};
-use crate::eval::evaluate;
-use crate::movegen::{generate_moves, Move};
+use crate::eval::{evaluate, PIECE_VALUES};
+use crate::movegen::{generate_moves, Move, Flag};
+
+const BASIC_CAPTURE_BONUS: i32 = 1000;
+
 
 fn inner_negamax(board: &mut GameState, depth: i8, mut alpha: i32, beta: i32) -> i32 {
     if depth == 0 {
@@ -24,7 +27,7 @@ fn inner_negamax(board: &mut GameState, depth: i8, mut alpha: i32, beta: i32) ->
                 board.bitboards[k].trailing_zeros() as u8
             };
 
-            if board.is_attacked(king_index, !is_white) {
+            if board.is_attacked(king_index, !is_white) { // In a check
                 board.unmake_move(mov, undo);
                 continue;
             }
@@ -53,10 +56,10 @@ fn inner_negamax(board: &mut GameState, depth: i8, mut alpha: i32, beta: i32) ->
                 board.bitboards[k].trailing_zeros() as u8
             };
 
-            if board.is_attacked(king_index, !is_white) {
-                return -100_000 - depth as i32; // Checkmate
+            return if board.is_attacked(king_index, !is_white) {
+                -100_000 - depth as i32 // Checkmate
             } else {
-                return 0; // Stalemate
+                0 // Stalemate
             }
         }
 
@@ -101,3 +104,19 @@ pub fn root_negamax(board: &mut GameState, depth: i8) -> Option<Move> {
 
     best_mov
 }
+
+fn priority_score(board: &GameState, mov: Move) -> i32 {
+    let mut score: i32 = 0;
+    if mov.flag == Flag::Capture{
+        let bonus = 1000;
+        let attacker_val = PIECE_VALUES[board.index_pos_to_piece_type(mov.from)].strict_abs();
+        let victim_val = PIECE_VALUES[board.index_pos_to_piece_type(mov.to)].strict_abs();
+
+        score += victim_val * 10 - attacker_val + bonus;
+    }
+
+    // More will be added in the future
+
+    score
+}
+

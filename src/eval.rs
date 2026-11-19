@@ -5,7 +5,7 @@
 use crate::board::{GameState, P, p, N, n, B, b, R, r, Q, q, SideToMove};
 use crate::movegen::{FILE_A, FILE_H};
 
-const PIECE_VALUES: [i32; 12] = [
+pub const PIECE_VALUES: [i32; 12] = [
     100, 310, 320, 500, 900, 0,
     -100, -310, -320, -500, -900, -0,
 ];
