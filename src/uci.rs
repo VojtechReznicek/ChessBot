@@ -45,8 +45,39 @@ pub fn parse_uci(input: &[String], board: &mut GameState, ascii_mode: bool) {
                 print_generated_moves(&moves);
             }
 
+            let mut limit: u64 = 0;
+            let mut increment: u64 = 0;
+            let mut depth: Option<i8> = None;
+            if board.side_to_move == SideToMove::White {
+                for (i, txt) in input.iter().enumerate(){
+                    if txt == "wtime" {
+                        limit = input[i + 1].parse::<u64>().unwrap();
+                    }
+                    if txt == "winc" {
+                        increment = input[i + 1].parse::<u64>().unwrap();
+                    }
+                }
+            }
+            else {
+                for (i, txt) in input.iter().enumerate(){
+                    if txt == "btime" {
+                        limit = input[i + 1].parse::<u64>().unwrap();
+                    }
+                    if txt == "binc" {
+                        increment = input[i + 1].parse::<u64>().unwrap();
+                    }
+                }
+            }
+            if limit == 0 && increment == 0 {
+                for (i, txt) in input.iter().enumerate(){
+                    if txt == "depth" {
+                        depth = Some(input[i + 1].parse::<i8>().unwrap());
+                    }
+                }
+            }
 
-            if let Some(best_move) = root_negamax(board, 5) {
+
+            if let Some(best_move) = root_negamax(board, depth, limit, increment) {
                 let from_sq = index_to_algebraic(best_move.from);
                 let to_sq = index_to_algebraic(best_move.to);
 
