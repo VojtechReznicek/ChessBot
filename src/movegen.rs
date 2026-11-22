@@ -507,4 +507,70 @@ mod tests {
         let black_moves = generate_moves(&board);
         assert_eq!(black_moves.len(), 20, "Black must have exactly 20 moves in startpos");
     }
+
+    fn perft(board: &mut GameState, depth: u8) -> u64 {
+        if depth == 0 {
+            return 1;
+        }
+
+        let moves = generate_moves(board);
+        let mut nodes = 0;
+        let is_white = board.side_to_move == SideToMove::White;
+
+        for mov in moves {
+            let undo = board.make_move(mov);
+
+            let king_index = if is_white {
+                board.bitboards[K].trailing_zeros() as u8
+            } else {
+                board.bitboards[k].trailing_zeros() as u8
+            };
+
+            if !board.is_attacked(king_index, !is_white) {
+                nodes += perft(board, depth - 1);
+            }
+
+            board.unmake_move(mov, undo);
+        }
+
+        nodes
+    }
+
+    #[test]
+    fn test_perft_startpos() {
+        let mut board = GameState::new();
+        assert_eq!(perft(&mut board, 1), 20);
+        assert_eq!(perft(&mut board, 2), 400);
+        assert_eq!(perft(&mut board, 3), 8_902);
+        assert_eq!(perft(&mut board, 4), 197_281);
+    }
+
+    #[test]
+    fn test_perft_kiwipete() {
+        let mut board = GameState::fen(
+            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1"
+        );
+        assert_eq!(perft(&mut board, 1), 48);
+        assert_eq!(perft(&mut board, 2), 2_039);
+        assert_eq!(perft(&mut board, 3), 97_862);
+    }
+
+    #[test]
+    fn test_perft_endgame_ep_and_pins() {
+        let mut board = GameState::fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1");
+        assert_eq!(perft(&mut board, 1), 14);
+        assert_eq!(perft(&mut board, 2), 191);
+        assert_eq!(perft(&mut board, 3), 2_812);
+        assert_eq!(perft(&mut board, 4), 43_238);
+    }
+
+    #[test]
+    fn test_perft_promotions_and_castling() {
+        let mut board = GameState::fen(
+            "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8"
+        );
+        assert_eq!(perft(&mut board, 1), 44);
+        assert_eq!(perft(&mut board, 2), 1_486);
+        assert_eq!(perft(&mut board, 3), 62_379);
+    }
 }
