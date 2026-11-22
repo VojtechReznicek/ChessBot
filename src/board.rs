@@ -6,6 +6,7 @@
 
 #![allow(non_upper_case_globals)]
 
+
 use crate::board::SideToMove::{Black, White};
 use crate::movegen::{Flag, Move, FILE_A, FILE_H};
 use crate::movespreloader::{EAST_ATTACKS, KING_ATTACKS, KNIGHT_ATTACKS, NORTH_ATTACKS, NORTH_EAST_ATTACKS, NORTH_WEST_ATTACKS, SOUTH_ATTACKS, SOUTH_EAST_ATTACKS, SOUTH_WEST_ATTACKS, WEST_ATTACKS};
@@ -55,6 +56,8 @@ pub struct Undo {
 }
 
 impl GameState {
+
+    /// Constructor for the "position startpos" case
     pub fn new() -> Self {
         let mut pieces = [0; 12];
 
@@ -73,7 +76,7 @@ impl GameState {
         pieces[k] = 0x1000_0000_0000_0000;
 
         let side_to_move = White;
-        let castling_rights= CastlingRights{
+        let castling_rights = CastlingRights{
             white_queenside: true,
             white_kingside: true,
             black_queenside: true,
@@ -84,14 +87,71 @@ impl GameState {
         Self { bitboards: pieces, side_to_move, castling_rights, halfmove_clock, en_passant_mask }
     }
 
+    /// Constructor for the "position fen <fenstring>" case
+    pub fn fen(fenstring: &str) -> Self {
+        let mut parts = fenstring.split_whitespace();
+        let board_part = parts.next().unwrap();
+        let turn_part = parts.next().unwrap();
+        let castling_part = parts.next().unwrap();
+        let ep_part = parts.next().unwrap();
+        let halfmove_part = parts.next().unwrap_or("0");
+
+        let mut pieces = [0; 12];
+        let mut row: usize = 7;
+        let mut col: usize = 0;
+        for i in board_part.chars() {
+            match i {
+                'P' => pieces[P] |= 1u64 << col + row * 8,
+                'N' => pieces[N] |= 1u64 << col + row * 8,
+                'B' => pieces[B] |= 1u64 << col + row * 8,
+                'R' => pieces[R] |= 1u64 << col + row * 8,
+                'Q' => pieces[Q] |= 1u64 << col + row * 8,
+                'K' => pieces[K] |= 1u64 << col + row * 8,
+                'p' => pieces[p] |= 1u64 << col + row * 8,
+                'n' => pieces[n] |= 1u64 << col + row * 8,
+                'b' => pieces[b] |= 1u64 << col + row * 8,
+                'r' => pieces[r] |= 1u64 << col + row * 8,
+                'q' => pieces[q] |= 1u64 << col + row * 8,
+                'k' => pieces[k] |= 1u64 << col + row * 8,
+                '1'..='8' => {col += i.to_digit(10).unwrap() as usize; continue},
+                '/' => {row -= 1; col = 0; continue},
+                _ => panic!("Invalid fen string (board part)!"),
+            };
+            col += 1;
+        }
+
+        let side_to_move: SideToMove = match turn_part {
+            "w" => White,
+            "b" => Black,
+            _ => panic!("Invalid fen string (turn part)!"),
+        };
+
+        let castling_rights = CastlingRights {
+            white_kingside: castling_part.contains('K'),
+            white_queenside: castling_part.contains('Q'),
+            black_kingside: castling_part.contains('k'),
+            black_queenside: castling_part.contains('q'),
+        };
+
+        let en_passant_mask = if ep_part == "-" {
+            0
+        } else {
+            square_to_mask(ep_part)
+        };
+
+        let halfmove_clock = halfmove_part.parse::<u8>().unwrap();
+
+        Self { bitboards: pieces, side_to_move, castling_rights, halfmove_clock, en_passant_mask }
+    }
+
 
     pub fn make_uci_moves(&mut self, moves: &[String]) {
-        if moves.len() % 2 == 0 {
-            self.side_to_move = White;
-        }
-        else {
-            self.side_to_move = Black;
-        }
+        //if moves.len() % 2 == 0 {
+        //    self.side_to_move = White;
+        //}
+        //else {
+        //    self.side_to_move = Black;
+        //}
         for m in moves {
 
             let bytes = m.as_bytes();
@@ -142,7 +202,6 @@ impl GameState {
                     self.bitboards[promoting_type] ^= to_mask;
                 }
                 self.halfmove_clock = 0;
-                continue;
             }
             else {  // Normal move, castle, En Passant
                 let is_pawn_moving = (self.bitboards[P] & from_mask) != 0 || (self.bitboards[p] & from_mask) != 0;
@@ -166,7 +225,7 @@ impl GameState {
                     self.bitboards[P] &= !en_passant_capture_mask;
                 }
 
-                for i in 0..12 { // The moNotve
+                for i in 0..12 { // The move
                     if (self.bitboards[i] & from_mask) != 0 {
                         self.bitboards[i] ^= move_mask;
                         if (i == P || i == p) && from_mask.trailing_zeros().abs_diff(to_mask.trailing_zeros()) == 16 {
@@ -218,6 +277,9 @@ impl GameState {
                 "h8" => self.castling_rights.black_kingside = false,
                 _ => {}
             }
+
+            if self.side_to_move == White { self.side_to_move = Black; }
+            else { self.side_to_move = White; }
         }
     }
 

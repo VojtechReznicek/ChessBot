@@ -18,18 +18,22 @@ pub fn parse_uci(input: &[String], board: &mut GameState, ascii_mode: bool) {
         },
         "isready" => println!("readyok"),
         "position" => {
-            *board = GameState::new();
-            for (i, txt) in input.iter().enumerate() {
-                if txt == "moves" {
-                    board.make_uci_moves(&input[i + 1..]);
-                    if ascii_mode {
-                        print_board(board);
-                    }
-                    break;
-                }
+            let moves_index = input.iter().position(|txt| txt == "moves");
 
+            if input.get(1).map(|s| s.as_str()) == Some("startpos") {
+                *board = GameState::new();
+            } else if input.get(1).map(|s| s.as_str()) == Some("fen") {
+                let fen_end = moves_index.unwrap_or(input.len());
+                *board = GameState::fen(&input[2..fen_end].join(" "));
             }
 
+            if let Some(idx) = moves_index {
+                board.make_uci_moves(&input[idx + 1..]);
+            }
+
+            if ascii_mode {
+                print_board(board);
+            }
         },
         "go" => {
 

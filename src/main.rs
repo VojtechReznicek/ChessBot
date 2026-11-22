@@ -19,6 +19,7 @@ fn main() {
             ascii_mode = true;
         }
     }
+
     let mut board = GameState::new();
 
     loop {
