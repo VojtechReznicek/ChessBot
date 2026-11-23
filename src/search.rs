@@ -22,7 +22,8 @@ fn inner_negamax(board: &mut GameState, depth: i8, mut alpha: i32, beta: i32, ti
     if depth == 0 {
         evaluate(board)
     } else {
-        let moves = generate_moves(board);
+        let mut moves = generate_moves(board);
+        sort_moves(&board, &mut moves);
         let mut legal_moves = 0;
         let mut best: i32 = -10_000_000;
 
@@ -102,7 +103,7 @@ pub fn root_negamax(board: &mut GameState, depth: Option<i8>, limit: u64, increm
     };
 
 
-    let moves = &generate_moves(board);
+    let mut moves = generate_moves(board);
     if depth.is_some() {
         time.limit = Duration::MAX;
     }
@@ -111,12 +112,13 @@ pub fn root_negamax(board: &mut GameState, depth: Option<i8>, limit: u64, increm
     if moves.is_empty() {
         return None;
     }
+    sort_moves(&board, &mut moves);
 
     let mut best: i32;
     let mut alpha: i32;
     let mut best_mov: Option<Move> = None;
 
-    let mut best_depth_move: Option<Move> = None;
+    let mut best_depth_move: Option<Move>;
 
     for i in 1..=depth {
         best = -10_000_000;
@@ -124,7 +126,7 @@ pub fn root_negamax(board: &mut GameState, depth: Option<i8>, limit: u64, increm
         best_depth_move = None;
         
         let is_white = board.side_to_move == SideToMove::White;
-        for mov in moves {
+        for mov in &moves {
             let undo = board.make_move(*mov);
 
             let king_index = if is_white {
@@ -159,7 +161,8 @@ pub fn root_negamax(board: &mut GameState, depth: Option<i8>, limit: u64, increm
     best_mov
 }
 
-fn priority_score(board: &GameState, mov: Move) -> i32 {
+
+fn priority_score(board: &GameState, mov: &Move) -> i32 {
     let mut score: i32 = 0;
     if mov.flag == Flag::Capture{
         let attacker_val = PIECE_VALUES[board.index_pos_to_piece_type(mov.from)].strict_abs();
@@ -168,8 +171,59 @@ fn priority_score(board: &GameState, mov: Move) -> i32 {
         score += victim_val * 10 - attacker_val + BASIC_CAPTURE_BONUS;
     }
 
-    // More will be added in the future
+    // More flags (En Passant, Promotes, Promotes with Captures) to be added in the future
 
     score
 }
 
+fn sort_moves(board: &GameState, moves: &mut [Move]) {
+    moves.sort_unstable_by_key(|mov| -priority_score(board, mov))
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bench_move_ordering() {
+        let positions = [
+            ("Startpos", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
+            ("Kiwipete (tactical)", "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1"),
+            ("Middlegame", "r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1"),
+        ];
+
+        let depth = 5;
+        let mut total_nodes: u64 = 0;
+        let total_start = Instant::now();
+
+        println!("\n--- Benchmark (depth {}) ---", depth);
+        for (name, fen) in positions {
+            let mut board = GameState::fen(fen);
+            let mut time = TimeManagement {
+                limit: Duration::MAX,
+                start: Instant::now(),
+                nodes_passed: 0,
+                stopped: false,
+            };
+
+            let score = inner_negamax(&mut board, depth, -10_000_000, 10_000_000, &mut time);
+            let ms = time.start.elapsed().as_millis();
+            total_nodes += time.nodes_passed;
+
+            println!(
+                "{:<20} | nodes: {:>10} | time: {:>5} ms | score: {}",
+                name, time.nodes_passed, ms, score
+            );
+        }
+
+        let total_ms = total_start.elapsed().as_millis().max(1);
+        let nps = (total_nodes as u128 * 1000) / total_ms;
+        println!("---------------------------------------------------------------");
+        println!(
+            "TOTAL                | nodes: {:>10} | time: {:>5} ms | {} NPS\n",
+            total_nodes, total_ms, nps
+        );
+    }
+}
