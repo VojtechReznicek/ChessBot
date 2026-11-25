@@ -1,3 +1,9 @@
+//! This module handles Zobrist hashing features. The keys are pre-generated in the compile time as const numbers.
+//! Zobrist hashing is good for identifying positions that were evaluated before to avoid losing time on them.
+
+use crate::board::GameState;
+use crate::board::SideToMove::White;
+
 struct ZobristKeys {
     pieces: [[u64; 64]; 12],
     side_to_move: u64,
@@ -6,10 +12,6 @@ struct ZobristKeys {
 }
 const SEED: u64 = 94498698040556907;
 const KEYS: ZobristKeys = generate_keys(SEED);
-const PIECES_KEY: [[u64; 64]; 12] = KEYS.pieces;
-const SIDE_TO_MOVE_KEY: u64 = KEYS.side_to_move;
-const CASTLING_KEY: [u64; 16] = KEYS.castling;
-const EN_PASSANT_KEY: [u64; 8] = KEYS.en_passant;
 
 const fn generate_key(seed: &mut u64) -> u64 {
     let mut res = *seed;
@@ -63,4 +65,80 @@ const fn change_seed_state(seed: &mut u64) {
     *seed ^= *seed << 13;
     *seed ^= *seed >> 7;
     *seed ^= *seed << 17;
+}
+
+
+pub fn hash_position(board: &GameState) -> u64 {
+    let mut res = 0;
+    for (i, bitboard) in board.bitboards.iter().enumerate() {
+        let mut bb = *bitboard;
+        while bb != 0 {
+            let sq = bb.trailing_zeros() as usize;
+            res ^= KEYS.pieces[i][sq];
+
+            bb &= bb - 1;
+        }
+
+    }
+
+    if board.side_to_move == White {
+        res ^= KEYS.side_to_move;
+    }
+
+    if board.en_passant_mask != 0 {
+        let i = (board.en_passant_mask.trailing_zeros() % 8) as usize;
+        res ^= KEYS.en_passant[i];
+    }
+
+    let mut castling_index = 0;
+    if board.castling_rights.black_kingside { castling_index += 1; }
+    if board.castling_rights.white_kingside { castling_index += 2; }
+    if board.castling_rights.black_queenside { castling_index += 4; }
+    if board.castling_rights.white_queenside { castling_index += 8; }
+
+    res ^= KEYS.castling[castling_index];
+
+
+    res
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn transposition_gives_same_hash() {
+        let mut board_a = GameState::new();
+        let moves1: Vec<String> = ["g1f3", "g8f6", "b1c3", "b8c6"]
+            .iter()
+            .map(|m| m.to_string())
+            .collect();
+        board_a.make_uci_moves(&moves1);
+
+        let mut board_b = GameState::new();
+        let moves2: Vec<String> = ["b1c3", "g8f6", "g1f3", "b8c6"]
+            .iter()
+            .map(|m| m.to_string())
+            .collect();
+
+        board_b.make_uci_moves(&moves2);
+
+        assert_eq!(hash_position(&board_a), hash_position(&board_b));
+    }
+
+    #[test]
+    fn different_state_flags_change_hash() {
+        let b_white = GameState::fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        let b_black = GameState::fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1");
+        let b_no_castle = GameState::fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1");
+        let b_ep = GameState::fen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
+
+        let h_white = hash_position(&b_white);
+        assert_ne!(h_white, hash_position(&b_black));
+        assert_ne!(h_white, hash_position(&b_no_castle));
+        assert_ne!(h_white, hash_position(&b_ep));
+    }
+
 }
