@@ -1,17 +1,17 @@
 //! This module handles Zobrist hashing features. The keys are pre-generated in the compile time as const numbers.
 //! Zobrist hashing is good for identifying positions that were evaluated before to avoid losing time on them.
 
-use crate::board::GameState;
+use crate::board::{CastlingRights, GameState};
 use crate::board::SideToMove::White;
 
-struct ZobristKeys {
-    pieces: [[u64; 64]; 12],
-    side_to_move: u64,
-    castling: [u64; 16],
-    en_passant: [u64; 8]
+pub struct ZobristKeys {
+    pub pieces: [[u64; 64]; 12],
+    pub side_to_move: u64,
+    pub castling: [u64; 16],
+    pub en_passant: [u64; 8]
 }
 const SEED: u64 = 94498698040556907;
-const KEYS: ZobristKeys = generate_keys(SEED);
+pub const KEYS: ZobristKeys = generate_keys(SEED);
 
 const fn generate_key(seed: &mut u64) -> u64 {
     let mut res = *seed;
@@ -100,6 +100,22 @@ pub fn hash_position(board: &GameState) -> u64 {
 
 
     res
+}
+
+pub fn castling_key(rights: CastlingRights) -> u64 {
+    let mut i = 0;
+    if rights.black_kingside { i += 1; }
+    if rights.white_kingside { i += 2; }
+    if rights.black_queenside { i += 4; }
+    if rights.white_queenside { i += 8; }
+    KEYS.castling[i]
+}
+pub fn en_passant_key(ep_mask: u64) -> u64 {
+    if ep_mask == 0 { 0 }
+    else {
+        let col = (ep_mask.trailing_zeros() % 8) as usize;
+        KEYS.en_passant[col]
+    }
 }
 
 
